@@ -1,0 +1,63 @@
+# Desktop Pal
+
+A little animal that lives in the corner of your Windows screen and reminds you to do things: drink water, take a break, pay that bill, call your mom.
+
+![Desktop Pal](docs/cover.png)
+
+When something is due, your pal wakes up, waves, makes a face that matches the reminder and shows a speech bubble with **Done** and **Snooze**.
+
+| | |
+|---|---|
+| ![Otter reminder](docs/otter.png) | ![Fox showing what's next](docs/fox.png) |
+
+## Download
+
+Get the latest installer from the [Releases](../../releases/latest) page:
+
+- **DesktopPal-x.y.z-Setup.exe** (recommended): one-click install, no admin needed
+- **DesktopPal-x.y.z-Portable.zip**: unzip anywhere and run `Desktop Pal.exe`
+
+Windows may show *"Windows protected your PC"* because the app isn't code-signed. Click **More info → Run anyway**.
+
+Installed copies update themselves: when a new release is published here, your pal tells you and offers **Restart now**.
+
+## Features
+
+- **Five pets:** sea otter, ginger cat, dog, red fox, red panda (original artwork)
+- **Reminders:** once, daily or weekly, every X minutes within set hours (overnight windows work), plus a to-do list
+- **Nine facial expressions:** picked automatically from the reminder's wording, or chosen by you
+- **Stays out of the way:** clicks pass through around the pet, drag it anywhere, hide it for a while
+- **Light on your PC:** animations run at 10 fps and pause while you're away or the screen is locked
+- **Private:** everything stays on your computer, with no account and no data collected
+
+![App window](docs/app.png)
+
+## For developers
+
+```bash
+npm install
+npm start              # run the app
+npm test               # scheduler unit tests (set TZ=Europe/Sofia for the clock-change cases)
+npm run test:e2e       # end-to-end tests (needs a display, e.g. xvfb-run)
+npm run build:art      # regenerate src/pet.html and src/pets/*.json from tools/ (Python + matplotlib)
+npm run dist           # build the Windows installer into dist/
+```
+
+**Releasing:** bump `version` in `package.json`, commit, then on GitHub go to **Actions → Build & release → Run workflow**.
+A Windows machine builds the installer and publishes it as a release. Installed copies pick it up automatically.
+
+### Project layout
+
+| Path | What it is |
+|---|---|
+| `src/main.js` | App process: windows, tray, scheduler, updater |
+| `src/pet.html` | The pet window (bubble, expressions, motion engine) |
+| `src/pets/*.json` | Artwork for each animal, loaded on demand |
+| `src/manager.html` | The reminders/settings window |
+| `tools/` | Art generator, screenshot scripts, tests, performance tools |
+| `.github/workflows/release.yml` | Builds and publishes releases |
+
+## License
+
+MIT. See [LICENSE](LICENSE). Built with [Electron](https://www.electronjs.org/).
+This project, including its artwork, was made with the help of Claude, an AI assistant.

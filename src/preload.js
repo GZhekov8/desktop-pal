@@ -1,0 +1,29 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('otter', {
+  // pet window
+  onState: (cb) => ipcRenderer.on('state', (_e, s) => cb(s)),
+  onCalm: (cb) => ipcRenderer.on('calm', (_e, v) => cb(v)),
+  ignore: (v) => ipcRenderer.send('pet:ignore', v),
+  done: (id) => ipcRenderer.send('pet:done', id),
+  snooze: (id, m) => ipcRenderer.send('pet:snooze', id, m),
+  open: (tab) => ipcRenderer.send('pet:open', tab),
+  hide: (m) => ipcRenderer.send('pet:hide', m),
+  ready: () => ipcRenderer.send('pet:ready'),
+  art: (a) => ipcRenderer.invoke('pet:art', a),
+  dragStart: () => ipcRenderer.send('pet:drag-start'),
+  drag: (dx, dy) => ipcRenderer.send('pet:drag', dx, dy),
+  dragEnd: () => ipcRenderer.send('pet:drag-end'),
+  // manager window
+  get: () => ipcRenderer.invoke('mgr:get'),
+  save: (r) => ipcRenderer.invoke('mgr:save', r),
+  remove: (id) => ipcRenderer.invoke('mgr:delete', id),
+  toggle: (id, f) => ipcRenderer.invoke('mgr:toggle', id, f),
+  settings: (s) => ipcRenderer.invoke('mgr:settings', s),
+  test: () => ipcRenderer.invoke('mgr:test'),
+  about: () => ipcRenderer.invoke('mgr:about'),
+  checkUpdate: () => ipcRenderer.invoke('mgr:checkUpdate'),
+  link: (u) => ipcRenderer.invoke('mgr:link', u),
+  onData: (cb) => ipcRenderer.on('data', (_e, d) => cb(d)),
+  onTab: (cb) => ipcRenderer.on('tab', (_e, t) => cb(t))
+});

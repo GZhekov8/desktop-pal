@@ -1,0 +1,347 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Desktop Pal — Reminders</title>
+<style>
+  :root { --bg: #f6f1ea; --card: #fffdf8; --ink: #2d2a26; --muted: #7d6e62; --line: #e7dccf; --accent: #e07a3f; --accent-d: #c4652e; --soft: #f1e7dc; --ok: #3f8f6b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 18px 24px 8px; }
+  header h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .tabs { display: flex; gap: 4px; padding: 6px 24px 0; border-bottom: 1px solid var(--line); }
+  .tab { border: 0; background: none; padding: 10px 14px; font: 600 14px "Segoe UI", system-ui; color: var(--muted); cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -1px; }
+  .tab.on { color: var(--ink); border-color: var(--accent); }
+  main { padding: 18px 24px 40px; max-width: 900px; }
+  .row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; }
+  .btn { cursor: pointer; border: 0; border-radius: 9px; padding: 8px 14px; font: 600 13px "Segoe UI", system-ui; background: var(--soft); color: var(--ink); }
+  .btn:hover { background: #e8d9c9; }
+  .btn.primary { background: var(--accent); color: #fff; } .btn.primary:hover { background: var(--accent-d); }
+  .btn.small { padding: 5px 10px; font-size: 12px; }
+  .btn.danger { color: #b2412c; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .item { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .item.off { opacity: .55; }
+  .item .t { font-weight: 600; }
+  .item .m { color: var(--muted); font-size: 12.5px; }
+  .item .acts { display: flex; gap: 6px; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--soft); color: #8a5a3a; margin-right: 6px; vertical-align: 1px; }
+  .pill.wait { background: #fde3d3; color: #b2532a; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 10px; background: var(--card); border: 1px dashed var(--line); border-radius: 12px; }
+  .switch { position: relative; width: 38px; height: 22px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch span { position: absolute; inset: 0; background: #d9cbbd; border-radius: 99px; cursor: pointer; transition: .15s; }
+  .switch span::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::before { transform: translateX(16px); }
+  .check { width: 20px; height: 20px; accent-color: var(--ok); cursor: pointer; }
+  .done .t { text-decoration: line-through; color: var(--muted); }
+  .quickadd { display: flex; gap: 8px; margin-bottom: 14px; }
+  input[type=text], input[type=number], input[type=time], input[type=datetime-local], textarea, select {
+    font: 14px "Segoe UI", system-ui; padding: 8px 10px; border: 1px solid #d8cabb; border-radius: 9px; background: #fff; color: var(--ink); width: 100%; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid #f0b48f; border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 60px; }
+  /* modal */
+  .scrim { position: fixed; inset: 0; background: rgba(40,28,18,.35); display: none; align-items: center; justify-content: center; padding: 20px; }
+  .scrim.show { display: flex; }
+  .modal { background: var(--card); border-radius: 16px; width: 520px; max-width: 100%; max-height: 100%; overflow: auto; padding: 20px 22px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  .modal h2 { margin: 0 0 14px; font-size: 18px; }
+  .f { margin-bottom: 12px; } .f label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .seg button { border: 1px solid #d8cabb; background: #fff; border-radius: 9px; padding: 8px 6px; cursor: pointer; font: 600 12.5px "Segoe UI", system-ui; color: var(--ink); }
+  .seg button.on { background: #fde3d3; border-color: var(--accent); color: #9a4a22; }
+  .days { display: flex; gap: 5px; flex-wrap: wrap; }
+  .days button { width: 42px; border: 1px solid #d8cabb; background: #fff; border-radius: 8px; padding: 6px 0; cursor: pointer; font: 600 12px "Segoe UI"; }
+  .days button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .help { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .set { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px; }
+  .set .r { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .set .r:last-child { border-bottom: 0; }
+  .set .r small { display: block; color: var(--muted); }
+  .set .r input, .set .r select { width: 160px; }
+  .hidden { display: none !important; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .chips button { border: 1px solid #d8cabb; background: #fff; border-radius: 99px; padding: 4px 10px; cursor: pointer; font: 12px "Segoe UI"; }
+  .chips button:hover { background: var(--soft); }
+</style>
+</head>
+<body>
+<header>
+  <svg width="40" height="40" viewBox="0 0 64 64">
+<defs><radialGradient id="g" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#f3a66b"/><stop offset="1" stop-color="#d9733a"/></radialGradient></defs>
+<circle cx="32" cy="32" r="30" fill="url(#g)"/>
+<g fill="#fff8ef">
+<ellipse cx="32" cy="40" rx="12" ry="10"/>
+<ellipse cx="17.5" cy="27" rx="5" ry="6.5" transform="rotate(-20 17.5 27)"/>
+<ellipse cx="26.5" cy="19.5" rx="5" ry="6.8" transform="rotate(-6 26.5 19.5)"/>
+<ellipse cx="37.5" cy="19.5" rx="5" ry="6.8" transform="rotate(6 37.5 19.5)"/>
+<ellipse cx="46.5" cy="27" rx="5" ry="6.5" transform="rotate(20 46.5 27)"/>
+</g></svg>
+  <div><h1>Desktop Pal</h1><div class="sub" id="summary"></div></div>
+</header>
+<div class="tabs">
+  <button class="tab on" data-tab="rem">Reminders</button>
+  <button class="tab" data-tab="todo">To-do list</button>
+  <button class="tab" data-tab="set">Settings</button>
+</div>
+
+<main>
+  <section id="tab-rem">
+    <div class="row-top"><div class="sub" style="color:var(--muted)">Timed and repeating reminders</div><button class="btn primary" id="addBtn">+ New reminder</button></div>
+    <div class="list" id="remList"></div>
+  </section>
+
+  <section id="tab-todo" class="hidden">
+    <div class="quickadd"><input type="text" id="todoInput" placeholder="Add a to-do and press Enter…"><button class="btn primary" id="todoAdd">Add</button></div>
+    <div class="list" id="todoList"></div>
+    <div class="help" id="todoHelp" style="margin-top:10px"></div>
+  </section>
+
+  <section id="tab-set" class="hidden">
+    <div class="set">
+      <div class="r"><div>Animal<small>Who keeps you company in the corner</small></div><select id="s-animal">
+        <option value="otter">Sea otter</option><option value="cat">Ginger cat</option><option value="dog">Dog</option><option value="fox">Red fox</option><option value="redpanda">Red panda</option>
+      </select></div>
+      <div class="r"><div>Pet's name<small>Shown in its speech bubble</small></div><input type="text" id="s-petName" maxlength="20"></div>
+      <div class="r"><div>Pet size</div><select id="s-size"><option value="0.75">Small</option><option value="1">Normal</option><option value="1.25">Large</option></select></div>
+      <div class="r"><div>Motion<small>Lively: gently bobs and breathes. Calm: stays still apart from blinking (uses the least power).</small></div><select id="s-motion"><option value="lively">Lively</option><option value="calm">Calm</option></select></div>
+      <div class="r"><div>Use graphics card<small>Smoother and lighter on the processor. If your pet disappears, turn this off again (from the tray icon → Open Desktop Pal). The app restarts to apply it.</small></div><label class="switch"><input type="checkbox" id="s-gpu"><span></span></label></div>
+      <div class="r"><div>Play a chime<small>Soft three-note sound when something is due</small></div><label class="switch"><input type="checkbox" id="s-sound"><span></span></label></div>
+      <div class="r"><div>Windows notifications too<small>Handy if your pet is hidden behind a full-screen app</small></div><label class="switch"><input type="checkbox" id="s-notifications"><span></span></label></div>
+      <div class="r"><div>Start with Windows</div><label class="switch"><input type="checkbox" id="s-startWithWindows"><span></span></label></div>
+      <div class="r"><div>Default snooze (minutes)</div><input type="number" id="s-snoozeDefault" min="1" max="240"></div>
+      <div class="r"><div>Nudge me about open to-dos every… (minutes)<small>0 turns to-do nudges off</small></div><input type="number" id="s-todoNudgeMin" min="0" max="600"></div>
+      <div class="r"><div>Try it<small>Make your pet show a reminder now</small></div><button class="btn" id="testBtn">Test reminder</button></div>
+    </div>
+    <div class="set" style="margin-top:14px">
+      <div class="r"><div>About<small id="aboutLine">Desktop Pal</small></div><button class="btn" id="updBtn">Check for updates</button></div>
+      <div class="r"><div>Privacy<small>Your reminders stay on this computer. Desktop Pal does not collect, send or share any data, and needs no account.</small></div></div>
+      <div class="r"><div>License<small>Free to use and share (MIT License). Built with Electron.</small></div></div>
+    </div>
+    <p class="help">Tips: drag your pet anywhere on screen · click it to see what's next · double-click or right-click to open this window · the tray icon (bottom-right, near the clock) lets you hide it or quit. Your reminders are saved on this computer.</p>
+  </section>
+</main>
+
+<div class="scrim" id="scrim">
+  <div class="modal">
+    <h2 id="mTitle">New reminder</h2>
+    <div class="f"><label>What should I remind you about?</label><input type="text" id="f-title" placeholder="e.g. Send the weekly report"></div>
+    <div class="f"><label>Note (optional)</label><textarea id="f-note" placeholder="Any details you want to see in the bubble"></textarea></div>
+    <div class="f"><label>When</label>
+      <div class="seg" id="f-type">
+        <button data-v="once">Once</button><button data-v="repeat">Daily / weekly</button><button data-v="interval">Every X min</button><button data-v="todo">To-do</button>
+      </div>
+    </div>
+
+    <div class="f t-once"><label>Date and time</label><input type="datetime-local" id="f-at">
+      <div class="chips" id="quickTimes"><button data-q="15">In 15 min</button><button data-q="30">In 30 min</button><button data-q="60">In 1 hour</button><button data-q="120">In 2 hours</button><button data-q="tom9">Tomorrow 9:00</button></div>
+    </div>
+    <div class="f t-repeat"><label>Time</label><input type="time" id="f-time" style="width:160px"></div>
+    <div class="f t-interval"><div class="three">
+      <div><label>Every (minutes)</label><input type="number" id="f-every" min="1" max="720"></div>
+      <div><label>From</label><input type="time" id="f-from"></div>
+      <div><label>Until</label><input type="time" id="f-to"></div>
+    </div><div class="help">Only reminds you between these hours.</div></div>
+    <div class="f t-repeat t-interval"><label>On these days</label>
+      <div class="days" id="f-days"></div>
+      <div class="chips"><button data-d="wk">Weekdays</button><button data-d="all">Every day</button><button data-d="we">Weekends</button></div>
+    </div>
+    <div class="f"><label>Pet's face for this reminder</label>
+      <select id="f-mood">
+        <option value="auto">Automatic (matches the reminder)</option>
+        <option value="excited">Excited</option><option value="happy">Happy</option><option value="surprised">Surprised</option>
+        <option value="serious">Serious</option><option value="worried">Worried</option><option value="sleepy">Sleepy</option>
+        <option value="love">Loving</option><option value="proud">Proud</option>
+      </select>
+      <div class="help">Automatic picks a face from the words: "pay the bill" looks serious, "drink water" looks happy, "call Mom" looks loving. Overdue reminders look worried.</div>
+    </div>
+    <div class="f t-todo help">To-dos have no fixed time — your pet nudges you about open ones every so often (change how often in Settings).</div>
+
+    <div class="foot"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mSave">Save</button></div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+let D = { reminders: [], settings: {}, queue: [] };
+let editing = null, ftype = 'once', fdays = [1,2,3,4,5];
+const DAYN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const ORDER = [1,2,3,4,5,6,0];
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function localISO(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function fmt(ms) {
+  if (!ms) return '';
+  const d = new Date(ms), now = new Date(), t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return 'today ' + t;
+  const tm = new Date(now); tm.setDate(tm.getDate() + 1);
+  if (d.toDateString() === tm.toDateString()) return 'tomorrow ' + t;
+  return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + t;
+}
+function daysText(days) {
+  const s = [...(days || [])].sort().join();
+  if (!days || days.length === 7 || !days.length) return 'every day';
+  if (s === '1,2,3,4,5') return 'weekdays';
+  if (s === '0,6') return 'weekends';
+  return ORDER.filter(d => days.includes(d)).map(d => DAYN[d]).join(', ');
+}
+function describe(r) {
+  if (r.type === 'once') return 'Once · ' + new Date(r.at).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (r.type === 'repeat') return `At ${r.time} · ${daysText(r.days)}`;
+  if (r.type === 'interval') return `Every ${r.every} min · ${r.from || '00:00'}–${r.to || '24:00'} · ${daysText(r.days)}`;
+  return '';
+}
+
+/* ---------- tabs ---------- */
+function showTab(t) {
+  $$('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  ['rem','todo','set'].forEach(k => $('#tab-' + k).classList.toggle('hidden', k !== t));
+  if (t === 'todo') setTimeout(() => $('#todoInput').focus(), 50);
+}
+$$('.tab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+/* ---------- render ---------- */
+function render() {
+  const rems = D.reminders.filter(r => r.type !== 'todo');
+  const todos = D.reminders.filter(r => r.type === 'todo');
+  const open = todos.filter(t => !t.done).length;
+  $('#summary').textContent = `${rems.filter(r => r.enabled && r.nextAt).length} active reminder(s) · ${open} open to-do(s)`;
+
+  rems.sort((a, b) => (a.nextAt || 9e15) - (b.nextAt || 9e15));
+  $('#remList').innerHTML = rems.length ? rems.map(r => {
+    const waiting = D.queue.includes(r.id);
+    const status = waiting ? '<span class="pill wait">waiting for you</span>'
+      : r.type === 'once' && r.done ? '<span class="pill">done</span>'
+      : r.enabled && r.nextAt ? `<span class="pill">next ${esc(fmt(r.nextAt))}</span>` : '';
+    return `<div class="item ${r.enabled ? '' : 'off'}">
+      <label class="switch" title="On/off"><input type="checkbox" ${r.enabled ? 'checked' : ''} data-toggle="${r.id}"><span></span></label>
+      <div><div class="t">${esc(r.title)}</div><div class="m">${status}${esc(describe(r))}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
+      <div class="acts"><button class="btn small" data-edit="${r.id}">Edit</button><button class="btn small danger" data-del="${r.id}">Delete</button></div>
+    </div>`;
+  }).join('') : `<div class="empty">No reminders yet. Click <b>+ New reminder</b> to add one.</div>`;
+
+  todos.sort((a, b) => (a.done - b.done) || (a.created || 0) - (b.created || 0));
+  $('#todoList').innerHTML = todos.length ? todos.map(t => `<div class="item ${t.done ? 'done' : ''}">
+      <input type="checkbox" class="check" ${t.done ? 'checked' : ''} data-done="${t.id}">
+      <div><div class="t">${esc(t.title)}</div>${t.note ? `<div class="m">${esc(t.note)}</div>` : ''}</div>
+      <div class="acts"><button class="btn small" data-edit="${t.id}">Edit</button><button class="btn small danger" data-del="${t.id}">Delete</button></div>
+    </div>`).join('') : `<div class="empty">Your list is empty. Nice work!</div>`;
+  const n = Number(D.settings.todoNudgeMin) || 0;
+  $('#todoHelp').textContent = n ? `${D.settings.petName || 'Your pet'} will nudge you about open to-dos every ${n} minutes.` : 'To-do nudges are off (turn them on in Settings).';
+
+  $$('[data-toggle]').forEach(el => el.onchange = () => window.otter.toggle(el.dataset.toggle, 'enabled'));
+  $$('[data-done]').forEach(el => el.onchange = () => window.otter.toggle(el.dataset.done, 'done'));
+  $$('[data-edit]').forEach(el => el.onclick = () => openForm(D.reminders.find(r => r.id === el.dataset.edit)));
+  $$('[data-del]').forEach(el => el.onclick = () => { if (confirm('Delete this?')) window.otter.remove(el.dataset.del); });
+
+  // settings
+  const s = D.settings;
+  for (const k of ['petName','snoozeDefault','todoNudgeMin']) { const el = $('#s-' + k); if (document.activeElement !== el) el.value = s[k]; }
+  $('#s-size').value = String(s.size);
+  $('#s-animal').value = s.animal || 'otter';
+  $('#s-motion').value = s.motion || 'lively';
+  $('#s-gpu').checked = !!s.gpu;
+  for (const k of ['sound','notifications','startWithWindows']) $('#s-' + k).checked = !!s[k];
+}
+for (const k of ['petName','snoozeDefault','todoNudgeMin','size','animal','motion']) $('#s-' + k).onchange = (e) => {
+  const v = k === 'petName' ? (e.target.value.trim() || 'Ollie') : (k === 'animal' || k === 'motion') ? e.target.value : Number(e.target.value);
+  window.otter.settings({ [k]: v });
+};
+for (const k of ['sound','notifications','startWithWindows','gpu']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: e.target.checked });
+$('#testBtn').onclick = () => window.otter.test();
+const UPD = { idle: 'Up to date', latest: 'Up to date', checking: 'Checking for updates…', error: "Couldn't check for updates right now", ready: 'An update is ready' };
+let ABOUT = { version: '', page: '', canUpdate: false };
+function paintAbout(u) {
+  u = u || {};
+  let line = `Desktop Pal ${ABOUT.version}`;
+  if (ABOUT.canUpdate || (u.status && u.status !== 'off')) {
+    if (u.status === 'downloading') line += ` · Downloading version ${u.version}… ${u.percent || 0}%`;
+    else if (u.status === 'ready') line += ` · Version ${u.version} is ready`;
+    else if (UPD[u.status]) line += ` · ${UPD[u.status]}`;
+    $('#updBtn').textContent = u.status === 'ready' ? 'Restart to update' : 'Check for updates';
+    $('#updBtn').style.display = '';
+    $('#updBtn').onclick = async () => { $('#updBtn').disabled = true; paintAbout(await window.otter.checkUpdate()); $('#updBtn').disabled = false; };
+  } else if (ABOUT.page) { $('#updBtn').textContent = 'Check for updates'; $('#updBtn').style.display = ''; $('#updBtn').onclick = () => window.otter.link(ABOUT.page); }
+  else $('#updBtn').style.display = 'none';
+  $('#aboutLine').textContent = line;
+}
+window.otter.about().then(a => { ABOUT = a; paintAbout(a.update); });
+
+/* ---------- to-do quick add ---------- */
+function addTodo() {
+  const v = $('#todoInput').value.trim(); if (!v) return;
+  window.otter.save({ type: 'todo', title: v, note: '', done: false, enabled: true });
+  $('#todoInput').value = '';
+}
+$('#todoAdd').onclick = addTodo;
+$('#todoInput').onkeydown = (e) => { if (e.key === 'Enter') addTodo(); };
+
+/* ---------- form ---------- */
+$('#f-days').innerHTML = ORDER.map(d => `<button data-day="${d}">${DAYN[d]}</button>`).join('');
+$$('#f-days button').forEach(b => b.onclick = () => { const d = +b.dataset.day; fdays = fdays.includes(d) ? fdays.filter(x => x !== d) : [...fdays, d]; paintDays(); });
+$$('[data-d]').forEach(b => b.onclick = () => { fdays = { wk: [1,2,3,4,5], all: [0,1,2,3,4,5,6], we: [0,6] }[b.dataset.d]; paintDays(); });
+function paintDays() { $$('#f-days button').forEach(b => b.classList.toggle('on', fdays.includes(+b.dataset.day))); }
+$$('#f-type button').forEach(b => b.onclick = () => setType(b.dataset.v));
+function setType(t) {
+  ftype = t;
+  $$('#f-type button').forEach(b => b.classList.toggle('on', b.dataset.v === t));
+  $$('.t-once,.t-repeat,.t-interval,.t-todo').forEach(el => el.classList.add('hidden'));
+  $$('.t-' + t).forEach(el => el.classList.remove('hidden'));
+}
+$$('#quickTimes button').forEach(b => b.onclick = () => {
+  const q = b.dataset.q; let d = new Date();
+  if (q === 'tom9') { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); } else d = new Date(Date.now() + q * 60000);
+  $('#f-at').value = localISO(d);
+});
+function openForm(r) {
+  editing = r || null;
+  $('#mTitle').textContent = r ? 'Edit' : 'New reminder';
+  $('#f-title').value = r?.title || '';
+  $('#f-note').value = r?.note || '';
+  $('#f-mood').value = r?.mood || 'auto';
+  const soon = new Date(Date.now() + 60 * 60000); soon.setMinutes(Math.ceil(soon.getMinutes() / 5) * 5, 0, 0);
+  $('#f-at').value = r?.at || localISO(soon);
+  $('#f-time').value = r?.time || '09:00';
+  $('#f-every').value = r?.every || 45;
+  $('#f-from').value = r?.from || '09:00';
+  $('#f-to').value = r?.to || '18:00';
+  fdays = r?.days ? [...r.days] : [1,2,3,4,5]; paintDays();
+  setType(r?.type || 'once');
+  $('#scrim').classList.add('show');
+  setTimeout(() => $('#f-title').focus(), 30);
+}
+function closeForm() { $('#scrim').classList.remove('show'); editing = null; }
+$('#addBtn').onclick = () => openForm();
+$('#mCancel').onclick = closeForm;
+$('#scrim').onclick = (e) => { if (e.target.id === 'scrim') closeForm(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeForm(); });
+$('#mSave').onclick = async () => {
+  const title = $('#f-title').value.trim();
+  if (!title) { $('#f-title').focus(); $('#f-title').style.outline = '2px solid #e07a3f'; return; }
+  const r = { ...(editing || {}), type: ftype, title, note: $('#f-note').value.trim(), mood: $('#f-mood').value, enabled: editing ? editing.enabled : true };
+  if (ftype === 'once') { if (!$('#f-at').value) return $('#f-at').focus(); r.at = $('#f-at').value; r.done = false; }
+  if (ftype === 'repeat') { r.time = $('#f-time').value || '09:00'; r.days = fdays.length ? fdays : [0,1,2,3,4,5,6]; }
+  if (ftype === 'interval') { r.every = Math.max(1, Number($('#f-every').value) || 30); r.from = $('#f-from').value || '00:00'; r.to = $('#f-to').value || '23:59'; r.days = fdays.length ? fdays : [0,1,2,3,4,5,6]; }
+  if (ftype === 'todo') { r.done = editing?.type === 'todo' ? editing.done : false; }
+  await window.otter.save(r);
+  closeForm();
+  if (ftype === 'todo') showTab('todo'); else showTab('rem');
+};
+
+/* ---------- boot ---------- */
+window.otter.onData((d) => { D = d; render(); if (d.update) paintAbout(d.update); });
+window.otter.onTab((t) => { if (t === 'new') { showTab('rem'); openForm(); } else showTab(t); });
+window.otter.get().then((d) => {
+  D = d; render();
+  const tab = new URLSearchParams(location.search).get('tab');
+  if (tab === 'new') openForm(); else if (tab) showTab(tab);
+});
+setInterval(render, 30000);
+</script>
+</body>
+</html>
