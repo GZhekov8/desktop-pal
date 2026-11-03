@@ -1,0 +1,46 @@
+# Builds the Windows installer on a real Windows machine and publishes it as a GitHub release.
+# Run it from the Actions tab ("Run workflow"), or by pushing a tag like v1.3.0.
+# The release includes latest.yml, which is what Desktop Pal's built-in updater checks.
+name: Build & release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Scheduler tests
+        run: node tools/unit.js
+        env:
+          TZ: Europe/Sofia
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Point the app at this repository (updates + Check for updates button)
+        shell: bash
+        run: |
+          npm pkg set repository.url=https://github.com/${{ github.repository }}
+          npm pkg set homepage=https://github.com/${{ github.repository }}/releases
+      - name: Build installer + portable zip and publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --x64 --publish always
