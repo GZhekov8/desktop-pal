@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dl/
+pkg/
+itch/raw/
+*.log
+dev-app-update.yml
+__pycache__/
