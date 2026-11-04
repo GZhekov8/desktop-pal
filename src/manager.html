@@ -135,6 +135,11 @@
       <div class="r"><div>Use graphics card<small>Smoother and lighter on the processor. If your pet disappears, turn this off again (from the tray icon → Open Desktop Pal). The app restarts to apply it.</small></div><label class="switch"><input type="checkbox" id="s-gpu"><span></span></label></div>
       <div class="r"><div>Walks around<small>Your pet strolls along the bottom of the screen now and then, and comes back home.</small></div>
         <div style="display:flex;gap:6px;align-items:center"><select id="s-walk" style="width:120px"><option value="off">Off</option><option value="sometimes">Sometimes</option><option value="often">Often</option></select><button class="btn small" id="walkNow">Walk now</button></div></div>
+      <div class="r"><div>Gaming mode<small id="gameLine">When a full-screen game is running, your pet hides and reminders wait until you stop playing. Browsers and video players don't count.</small></div><label class="switch"><input type="checkbox" id="s-gaming"><span></span></label></div>
+      <div class="r game-sub"><div>Break nudge while playing<small>Your pet peeks in (without interrupting the game) to suggest a short break</small></div>
+        <select id="s-gameBreakMin" style="width:150px"><option value="0">Off</option><option value="60">Every hour</option><option value="90">Every 1½ hours</option><option value="120">Every 2 hours</option><option value="180">Every 3 hours</option></select></div>
+      <div class="r game-sub"><div>Bedtime warning<small>Peeks in once if you're still playing at this time</small></div>
+        <div style="display:flex;gap:6px;align-items:center"><label class="switch"><input type="checkbox" id="s-bedOn"><span></span></label><input type="time" id="s-bedTime" style="width:110px"></div></div>
       <div class="r"><div>Sounds<small>Reminder chime and your pet's voice</small></div><label class="switch"><input type="checkbox" id="s-sound"><span></span></label></div>
       <div class="r"><div>Volume</div><div class="rng"><input type="range" id="s-volume" min="0" max="100" step="5"><output id="o-volume">70%</output></div></div>
       <div class="r"><div>Animal voice<small>A short purr, bark, squeak or yip when you pet it, feed it or it calls you</small></div><label class="switch"><input type="checkbox" id="s-voices"><span></span></label></div>
@@ -280,7 +285,12 @@ function render() {
   $('#s-gpu').checked = !!s.gpu;
   for (const k of ['sound','notifications','startWithWindows']) $('#s-' + k).checked = !!s[k];
   $('#s-voices').checked = s.voices !== false; $('#s-quietOn').checked = !!s.quietOn;
-  for (const k of ['quietFrom','quietTo','walk','focusReminders','focusMin','breakMin','longBreakMin']) { const el = $('#s-' + k); if (document.activeElement !== el && s[k] != null) el.value = s[k]; }
+  $('#s-gaming').checked = s.gaming !== false; $('#s-bedOn').checked = s.bedOn !== false;
+  document.querySelectorAll('.game-sub').forEach(r => r.style.opacity = s.gaming === false ? .45 : 1);
+  const gm = D.gaming || {};
+  $('#gameLine').textContent = gm.on ? `Playing now${gm.exe ? ' (' + gm.exe.replace(/\.exe$/i, '') + ')' : ''}: your pet is hiding and ${D.focus.held || 0} reminder${(D.focus.held || 0) === 1 ? ' is' : 's are'} waiting.`
+    : "When a full-screen game is running, your pet hides and reminders wait until you stop playing. Browsers and video players don't count.";
+  for (const k of ['quietFrom','quietTo','walk','focusReminders','focusMin','breakMin','longBreakMin','gameBreakMin','bedTime']) { const el = $('#s-' + k); if (document.activeElement !== el && s[k] != null) el.value = s[k]; }
   if (document.activeElement !== $('#s-volume')) { $('#s-volume').value = s.volume == null ? 70 : s.volume; $('#o-volume').textContent = $('#s-volume').value + '%'; }
   $$('#f-preset button').forEach(b => b.classList.toggle('on', b.dataset.v === (s.focusPreset || '25/5')));
   $('#customRow').classList.toggle('hidden', (s.focusPreset || '25/5') !== 'custom');
@@ -297,8 +307,9 @@ for (const k of ['petName','snoozeDefault','todoNudgeMin','animal','motion']) $(
   const v = k === 'petName' ? (e.target.value.trim() || 'Ollie') : (k === 'animal' || k === 'motion') ? e.target.value : Number(e.target.value);
   window.otter.settings({ [k]: v });
 };
-for (const k of ['sound','notifications','startWithWindows','gpu','voices','quietOn']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: e.target.checked });
-for (const k of ['quietFrom','quietTo','walk','focusReminders']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: e.target.value });
+for (const k of ['sound','notifications','startWithWindows','gpu','voices','quietOn','gaming','bedOn']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: e.target.checked });
+for (const k of ['quietFrom','quietTo','walk','focusReminders','bedTime']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: e.target.value });
+$('#s-gameBreakMin').onchange = (e) => window.otter.settings({ gameBreakMin: Number(e.target.value) });
 for (const k of ['focusMin','breakMin','longBreakMin']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: Math.max(1, Number(e.target.value) || 1) });
 $('#s-volume').oninput = (e) => { $('#o-volume').textContent = e.target.value + '%'; };
 $('#s-volume').onchange = (e) => window.otter.settings({ volume: Number(e.target.value) });

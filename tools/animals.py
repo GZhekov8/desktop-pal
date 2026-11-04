@@ -424,18 +424,23 @@ def walker(name):
     edge_strands(tst, w['tail'], w['tcol'], step=2, len_rng=(1.5, 3.5))
     nst = Strands(); fill_strands(nst, w['neck'], 260, w['col'], lambda x, y: -math.pi / 2 + .4, (2, 3.5))
     L = w['legLen']
-    def leg(x, color, phase, far):
-        return (f'<g class="leg" transform="translate({x} {w["hipY"]})"><g class="swing" data-phase="{phase}">'
-                f'<path d="M-9 -6 C-9.5 {L*.3:.0f} -6 {L*.7:.0f} -4 {L} L4 {L} C6 {L*.7:.0f} 9 {L*.3:.0f} 8.5 -6 Z" fill="{color}" filter="url(#fur)"/>'
-                f'<ellipse cx="1.5" cy="{L+1}" rx="6" ry="3.2" fill="{w["paw"] if not far else color}"/></g></g>')
+    def leg(x, color, phase, far, front):
+        # two-part leg: thigh swings at the hip, shin bends at the knee (paw lifts while stepping forward)
+        U = round(L * .52); D = L - U
+        paw = w['paw'] if not far else color
+        return (f'<g class="leg" transform="translate({x} {w["hipY"]})"><g class="swing" data-phase="{phase}" data-len="{L}" data-front="{1 if front else 0}">'
+                f'<path d="M-9 -6 C-9.5 {U*.5:.0f} -6.5 {U-1} -5.5 {U+2} L5.5 {U+2} C6.5 {U-1} 9 {U*.5:.0f} 8.5 -6 Z" fill="{color}" filter="url(#fur)"/>'
+                f'<g transform="translate(0 {U})"><g class="shin">'
+                f'<path d="M-5.6 -3 C-6 {D*.5:.0f} -4.6 {D*.9:.0f} -4 {D} L4 {D} C4.6 {D*.9:.0f} 6 {D*.5:.0f} 5.6 -3 Z" fill="{color}" filter="url(#fur)"/>'
+                f'<ellipse cx="1.5" cy="{D+1}" rx="6" ry="3.2" fill="{paw}"/></g></g></g></g>')
     b1, b2, f1, f2 = w['hips']
     ground = w['hipY'] + L + 2
     return (f'<g class="walker">'
-            f'<ellipse cx="118" cy="{ground}" rx="72" ry="4.5" fill="#000" opacity=".22" filter="url(#soft)"/>'
-            f'<g class="wtail"><path d="{w["tail"]}" fill="{w["tailFill"]}" filter="url(#fur)"/>{tst.svg()}</g>'
-            + leg(b2, w['farleg'], 3.14, True) + leg(f2, w['farleg'], 0, True) +
+            f'<ellipse class="wshadow" cx="118" cy="{ground}" rx="72" ry="4.5" fill="#000" opacity=".22" filter="url(#soft)"/>'
+            f'<g class="wmove"><g class="wtail"><path d="{w["tail"]}" fill="{w["tailFill"]}" filter="url(#fur)"/>{tst.svg()}</g>'
+            + leg(b2, w['farleg'], 3.14, True, False) + leg(f2, w['farleg'], 0, True, True) +
             f'<g class="wbody"><path d="{w["body"]}" fill="{w["fill"]}" filter="url(#fur)"/>{st.svg()}'
             f'<path d="{w.get("shine", "M70 86 C90 76 130 72 168 80")}" stroke="#ffe6c8" stroke-opacity=".25" stroke-width="2" fill="none" filter="url(#soft1)"/></g>'
-            + leg(b1, w['leg'], 0, False) + leg(f1, w['leg'], 3.14, False) +
-            f'<path d="{w["neck"]}" fill="{w["fill"]}" filter="url(#fur)"/>{nst.svg()}'
-            f'@@HEAD@@</g>')
+            + leg(b1, w['leg'], 0, False, False) + leg(f1, w['leg'], 3.14, False, True) +
+            f'<g class="wfront"><path d="{w["neck"]}" fill="{w["fill"]}" filter="url(#fur)"/>{nst.svg()}'
+            f'@@HEAD@@</g></g></g>')

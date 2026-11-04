@@ -130,7 +130,18 @@
   .pose-walk #slot-walk, .pose-stand #slot-walk { display: inline; }
   .pose-walk :is(#slot-float, #slot-float2, #slot-back, #slot-front),
   .pose-stand :is(#slot-float, #slot-float2, #slot-back, #slot-front) { display: none; }
-  .face-left #slot-walk > .walker { transform: scaleX(-1); transform-origin: 120px 0; }
+  #slot-walk > .walker { transform-origin: 120px 0; transition: transform .42s cubic-bezier(.45,0,.25,1); }
+  .face-left #slot-walk > .walker { transform: scaleX(-1); }
+  /* getting up to walk / settling back down (the otter flips over instead) */
+  .rise #slot-walk > .walker > .wmove { animation: riseUp .4s cubic-bezier(.3,0,.2,1); }
+  @keyframes riseUp { 0% { transform: translateY(14px) scaleY(.82); opacity: .35; } 60% { opacity: 1; } 100% { transform: none; } }
+  #slot-walk .wmove { transform-box: fill-box; transform-origin: 50% 100%; }
+  .settle .float { animation: settleDown .45s cubic-bezier(.3,0,.2,1); transform-origin: 50% 90%; }
+  @keyframes settleDown { 0% { transform: translateY(-10px) scaleY(1.08); opacity: .4; } 55% { transform: translateY(1px) scaleY(.97); opacity: 1; } 100% { transform: none; } }
+  .headset { display: none; }
+  .headset-on .headset { display: inline; animation: headsetOn .35s cubic-bezier(.3,1.5,.5,1); transform-box: fill-box; transform-origin: 50% 0; }
+  @keyframes headsetOn { from { transform: translateY(-14px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
+  #slot-walk .wtail { transform-box: fill-box; transform-origin: 100% 25%; }
   .flip .float { animation: flipOver .45s ease-in-out; }
   @keyframes flipOver { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(.85); } 100% { transform: rotate(360deg) scale(1); } }
   .petting .head { rotate: 7deg; }
@@ -532,26 +543,61 @@ function noise(start, dur, vol, filt, am) {
   else g.connect(master);
   src.start(start); src.stop(start + dur);
 }
-// a short, soft voice per animal; kind: 'pet' | 'happy' | 'call'
+// animal voices: real recordings for the otter, cat, dog and fox (see src/sounds/CREDITS.md);
+// the red panda's twitter and huff-quack are built from its real calls.
+const CLIPS = { otter: { pet: ['otter-pet'], happy: ['otter-happy'], call: ['otter-call'] },
+  cat: { pet: ['cat-pet'], happy: ['cat-happy', 'cat-happy2'], call: ['cat-call'] },
+  dog: { pet: ['dog-pet'], happy: ['dog-happy'], call: ['dog-call', 'dog-call2'] },
+  fox: { pet: ['fox-pet'], happy: ['fox-happy'], call: ['fox-call'] } };
+const LOUD = { pet: .55, happy: .8, call: .95 };
+const clipBufs = {}, clipLoading = {};
+function loadClips(animal) {
+  const set = CLIPS[animal]; if (!set || !window.otter.sound || !audio()) return;
+  for (const name of Object.values(set).flat()) {
+    if (clipBufs[name] || clipLoading[name]) continue;
+    clipLoading[name] = window.otter.sound(name)
+      .then(b => b && ctx.decodeAudioData(b.buffer ? b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) : b))
+      .then(buf => { if (buf) clipBufs[name] = buf; }).catch(() => {}).finally(() => { delete clipLoading[name]; });
+  }
+}
+function playClip(name, vol) {
+  const buf = clipBufs[name]; if (!buf) return false;
+  const src = ctx.createBufferSource(), g = ctx.createGain();
+  src.buffer = buf; src.playbackRate.value = .96 + Math.random() * .08;        // never quite the same twice
+  g.gain.value = vol; src.connect(g).connect(master); src.start(ctx.currentTime + .02);
+  return true;
+}
 function voice(kind) {
   const s = state.settings || {}; if (s.voices === false || !audio()) return;
-  const t = ctx.currentTime + .02, a = s.animal || 'otter';
-  try {
-    if (a === 'cat') {
-      if (kind === 'pet') noise(t, 1.6, .5, ['lowpass', 260], 23);                       // purr
-      else { tone('sawtooth', 480, 720, t, .22, .06, ['bandpass', 1100, 3]); tone('sawtooth', 720, 430, t + .2, .3, .06, ['bandpass', 1000, 3]); }   // mew
-    } else if (a === 'dog') {
-      if (kind === 'pet') tone('sine', 820, 1050, t, .45, .05);                           // happy whine
-      else { tone('sine', 230, 140, t, .16, .18); noise(t, .14, .12, ['bandpass', 700]); if (kind === 'call') { tone('sine', 240, 150, t + .25, .16, .18); noise(t + .25, .14, .12, ['bandpass', 700]); } }  // boof
-    } else if (a === 'fox') {
-      tone('triangle', 900, 1500, t, .11, .09); if (kind !== 'pet') tone('triangle', 950, 1600, t + .16, .11, .09);   // yip
-    } else if (a === 'redpanda') {
-      for (let i = 0; i < (kind === 'pet' ? 2 : 3); i++) tone('triangle', 1250, 1750, t + i * .11, .07, .07);          // twitter
-      if (kind === 'pet') noise(t + .25, .25, .08, ['bandpass', 900]);
-    } else {
-      for (let i = 0; i < (kind === 'pet' ? 2 : 3); i++) tone('sine', 1800, 2600, t + i * .1, .07, .06);              // otter squeak
-    }
-  } catch (_) {}
+  const a = s.animal || 'otter', set = CLIPS[a];
+  if (set) {
+    const names = set[kind] || set.happy, name = names[Math.floor(Math.random() * names.length)];
+    if (!playClip(name, LOUD[kind] || .8)) { loadClips(a); const p = clipLoading[name]; if (p) p.then(() => playClip(name, LOUD[kind] || .8)); }
+    return;
+  }
+  try { redPanda(kind, ctx.currentTime + .02); } catch (_) {}
+}
+// red panda: breathy "huff", nasal "quack", and a soft twitter of short rising squeaks
+function rpTwitter(t, n, vol) {
+  let at = t;
+  for (let i = 0; i < n; i++) {
+    const f = 2300 + Math.random() * 500, d = .045 + Math.random() * .025;
+    tone('sawtooth', f * .82, f, at, d, vol, ['bandpass', f * 1.05, 6]);
+    tone('sine', f * .82, f * 1.02, at, d, vol * .7);
+    at += d + .035 + Math.random() * .04;
+  }
+  return at;
+}
+function rpHuffQuack(t, vol) {
+  noise(t, .14, vol * 1.6, ['bandpass', 900]);                                   // huff
+  tone('sawtooth', 430, 330, t + .15, .13, vol, ['bandpass', 1250, 4]);          // quack
+  tone('square', 430, 330, t + .15, .13, vol * .25, ['bandpass', 2600, 6]);
+  return t + .3;
+}
+function redPanda(kind, t) {
+  if (kind === 'pet') { noise(t, .22, .07, ['bandpass', 800]); rpTwitter(t + .26, 2, .03); }
+  else if (kind === 'happy') rpTwitter(t, 4 + Math.floor(Math.random() * 2), .045);
+  else rpTwitter(rpHuffQuack(t, .07) + .08, 4, .05);
 }
 function munch() { if (!audio()) return; const t = ctx.currentTime + .02; for (let i = 0; i < 4; i++) noise(t + i * .2, .1, .18, ['bandpass', 1400]); }
 function chime() {
@@ -576,27 +622,54 @@ function chime() {
 let FPS = 10;
 let motionTimer = null, calm = false, motion = 'lively', parts = { float: null, w1: [], w2: [], rip: [], head: null, eyes: [] };
 let pose = 'rest';
+const gait = { p: 0, amp: 0, v: 0, sx: null, t: 0, turn: 0 };
+/* gaming headset: drawn to fit whatever head the current animal has */
+function addHeadsets() {
+  const NS = 'http://www.w3.org/2000/svg';
+  for (const head of document.querySelectorAll('#slot-float .head, #slot-walk .head')) {
+    if (head.querySelector(':scope > .headset')) continue;
+    let b; try { b = head.getBBox(); } catch (_) { continue; }
+    if (!b || !b.width) continue;
+    const x0 = b.x + b.width * .1, x1 = b.x + b.width * .9, cy = b.y + b.height * .56, top = b.y + b.height * .2;
+    const r = Math.max(6, b.width * .11), cx = (x0 + x1) / 2;
+    const g = document.createElementNS(NS, 'g'); g.setAttribute('class', 'headset');
+    g.innerHTML =
+      `<path d="M${x0} ${cy - r * .4} C${x0 - 2} ${top - b.height * .08} ${x1 + 2} ${top - b.height * .08} ${x1} ${cy - r * .4}" fill="none" stroke="#262a33" stroke-width="${(r * .5).toFixed(1)}" stroke-linecap="round"/>` +
+      `<path d="M${x0 + r * .3} ${cy - r * .5} C${x0} ${top} ${x1} ${top} ${x1 - r * .3} ${cy - r * .5}" fill="none" stroke="#4a5160" stroke-width="${(r * .16).toFixed(1)}" stroke-linecap="round" opacity=".8"/>` +
+      `<path d="M${x0 - r * .2} ${cy + r * .5} Q${x0 - r * .4} ${cy + r * 1.6} ${cx - r * .9} ${cy + r * 1.75}" fill="none" stroke="#262a33" stroke-width="${(r * .22).toFixed(1)}" stroke-linecap="round"/>` +
+      `<circle cx="${cx - r * .85}" cy="${cy + r * 1.75}" r="${(r * .3).toFixed(1)}" fill="#262a33"/>` +
+      [x0, x1].map(x => `<ellipse cx="${x}" cy="${cy}" rx="${(r * .78).toFixed(1)}" ry="${r.toFixed(1)}" fill="#2f3440"/>` +
+        `<ellipse cx="${x}" cy="${cy}" rx="${(r * .5).toFixed(1)}" ry="${(r * .68).toFixed(1)}" fill="none" stroke="#4fd1c5" stroke-width="${(r * .16).toFixed(1)}"/>`).join('');
+    head.appendChild(g);
+  }
+}
 function collectParts() {
+  addHeadsets();
   parts.float = document.querySelector('.float');
   parts.headRest = document.querySelector('#slot-float .head');
   parts.headWalk = document.querySelector('#slot-walk .head');
   parts.head = pose === 'rest' ? parts.headRest : parts.headWalk;
   parts.eyes = [...document.querySelectorAll('#slot-float .x-eyes-open, #slot-float .x-eyes-wide, #slot-float .iris, #slot-walk .x-eyes-open, #slot-walk .x-eyes-wide, #slot-walk .iris')];
-  parts.legs = [...document.querySelectorAll('#slot-walk .swing')].map(el => ({ el, ph: Number(el.dataset.phase) || 0 }));
-  parts.walker = document.querySelector('#slot-walk .wbody');
+  // 4-beat walk (like real quadrupeds): near hind, near front, far hind, far front, a quarter cycle apart
+  const OFF = { '1,0': .5, '1,1': .75, '0,0': 0, '0,1': .25 };
+  const wbody = document.querySelector('#slot-walk .wbody');
+  parts.legs = [...document.querySelectorAll('#slot-walk .swing')].map(el => {
+    const far = wbody && (el.compareDocumentPosition(wbody) & Node.DOCUMENT_POSITION_FOLLOWING) ? 1 : 0;   // far legs are drawn behind the body
+    const front = el.dataset.front === '1' ? 1 : 0;
+    return { el, shin: el.querySelector('.shin'), len: Number(el.dataset.len) || 38, front, off: OFF[`${far},${front}`] };
+  });
+  const sw = document.querySelector('#slot-walk'); parts.wsvg = sw && sw.ownerSVGElement;
+  parts.walker = document.querySelector('#slot-walk .wmove');
+  parts.wtail = document.querySelector('#slot-walk .wtail');
+  parts.wfront = document.querySelector('#slot-walk .wfront');
+  gait.p = 0; gait.amp = 0; gait.v = 0; gait.sx = null;
   parts.w1 = [...document.querySelectorAll('.water1')];
   parts.w2 = [...document.querySelectorAll('.water2')];
   parts.rip = [...document.querySelectorAll('.ripple')];
 }
 function frame() {
   const t = performance.now() / 1000, TAU = Math.PI * 2;
-  if (pose !== 'rest') {                       // walking legs (standing: legs straight)
-    const walking = pose === 'walk';
-    for (const L of parts.legs) L.el.setAttribute('transform', walking ? `rotate(${(Math.sin(TAU * 1.7 * t + L.ph) * 22).toFixed(1)})` : 'rotate(0)');
-    if (parts.walker) parts.walker.style.translate = walking ? `0 ${(Math.abs(Math.sin(TAU * 1.7 * t)) * -1.2).toFixed(2)}px` : '';
-    if (parts.float) parts.float.style.transform = '';
-    return;
-  }
+  if (pose !== 'rest') { walkFrame(t); if (parts.float) parts.float.style.transform = ''; return; }
   const isOtter = stage.classList.contains('pet-otter');
   if (parts.float) {
     if (stage.classList.contains('alert') || motion === 'calm') parts.float.style.transform = '';
@@ -607,6 +680,47 @@ function frame() {
   for (const el of parts.w1) el.style.transform = `translateX(${(-(t * 40 / 7) % 40).toFixed(1)}px)`;
   for (const el of parts.w2) el.style.transform = `translateX(${(-(t * 30 / 11) % 30).toFixed(1)}px)`;
   parts.rip.forEach((el, i) => { const p = ((t + i * 2) % 4) / 4; el.style.transform = `scale(${(.9 + .32 * p).toFixed(3)})`; el.style.opacity = (.8 * (1 - p)).toFixed(2); });
+}
+/* walking gait. The legs are driven by how far the window actually moved, so planted paws don't slide:
+   each paw is on the ground for DUTY of the cycle, sweeping back exactly as far as the body moves,
+   then lifts (knee bends) and swings forward. The body dips as the legs angle out, the head nods and
+   the tail sways with the steps. Starting and stopping blend in, so there's no snap between poses. */
+const DUTY = .62, SWING_A = 20 * Math.PI / 180, KNEE = 52;
+function walkFrame(t) {
+  const dt = Math.min(.12, Math.max(.001, t - (gait.t || t - .04))); gait.t = t;
+  const sx = window.screenX;
+  if (gait.sx != null) { const raw = Math.abs(sx - gait.sx) / dt; gait.v += (raw - gait.v) * Math.min(1, dt / .14); }
+  gait.sx = sx;
+  const moving = pose === 'walk' && gait.v > 4;
+  gait.amp += ((moving ? 1 : 0) - gait.amp) * Math.min(1, dt / (moving ? .22 : .3));
+  if (gait.amp < .002) gait.amp = 0;
+  const box = parts.wsvg && parts.wsvg.getBoundingClientRect(), k = box && box.width ? box.width / 240 : 1;
+  const L0 = (parts.legs[0] && parts.legs[0].len) || 38;
+  const cycle = 2 * L0 * Math.sin(SWING_A) * k / DUTY;                 // screen px travelled per full step cycle
+  if (moving) gait.p = (gait.p + gait.v * dt / cycle) % 1;
+  else if (gait.amp > 0) gait.p = (gait.p + dt * .6) % 1;               // finish the step gently while settling
+  let drop = 0, n = 0;
+  for (const L of parts.legs) {
+    const q = (gait.p + L.off) % 1;
+    let th, knee = 0;
+    if (q < DUTY) {                                                      // planted: paw moves back at body speed
+      const s = q / DUTY; th = -Math.asin(Math.sin(SWING_A) * (1 - 2 * s));
+      drop += L.len * (1 - Math.cos(th)); n++;
+    } else {                                                             // stepping: lift and swing forward
+      const s = (q - DUTY) / (1 - DUTY), e = (1 - Math.cos(Math.PI * s)) / 2;
+      th = SWING_A * (1 - 2 * e); knee = KNEE * Math.sin(Math.PI * s) * (L.front ? .8 : 1);
+    }
+    L.el.setAttribute('transform', `rotate(${(th * 180 / Math.PI * gait.amp).toFixed(1)})`);
+    if (L.shin) L.shin.setAttribute('transform', `rotate(${(knee * gait.amp).toFixed(1)})`);
+  }
+  const TAU = Math.PI * 2, a = gait.amp;
+  const breathe = Math.sin(TAU * t / 3.4) * .35 * (1 - a);              // standing still: soft breathing
+  const tt = gait.turn ? (t - gait.turn) / .42 : 1;                       // dip a little while turning around
+  const crouch = tt >= 0 && tt < 1 ? Math.sin(Math.PI * tt) * 3.2 : 0; if (tt >= 1) gait.turn = 0;
+  const bob = (n ? drop / n : 0) * a * .8 + breathe + crouch;
+  if (parts.walker) parts.walker.setAttribute('transform', `translate(0 ${bob.toFixed(2)})`);
+  if (parts.wfront) parts.wfront.setAttribute('transform', `translate(0 ${(Math.sin(TAU * 2 * gait.p + .8) * .9 * a).toFixed(2)})`);
+  if (parts.wtail) parts.wtail.style.rotate = `${(Math.sin(TAU * gait.p) * 5 * a + Math.sin(TAU * t / 2.7) * 2 * (1 - a)).toFixed(2)}deg`;
 }
 function startMotion() { if (!motionTimer && !calm) motionTimer = setInterval(frame, 1000 / FPS); }
 function stopMotion() { clearInterval(motionTimer); motionTimer = null; }
@@ -654,12 +768,18 @@ window.otter.onCursor && window.otter.onCursor((c) => { if (!calm) follow(c); })
 // poses from the app: 'rest' (at home), 'walk', 'stand' (stopped away from home)
 window.otter.onPose && window.otter.onPose(({ pose: p, dir }) => {
   const was = pose; pose = p;
-  if ((was === 'rest') !== (p === 'rest') && stage.classList.contains('pet-otter')) { stage.classList.add('flip'); setTimeout(() => stage.classList.remove('flip'), 460); }
+  const isOtter = stage.classList.contains('pet-otter');
+  if ((was === 'rest') !== (p === 'rest')) {
+    const cls = isOtter ? 'flip' : (p === 'rest' ? 'settle' : 'rise');
+    stage.classList.add(cls); setTimeout(() => stage.classList.remove(cls), 470);
+  }
+  if (was !== 'rest' && p !== 'rest' && (dir < 0) !== stage.classList.contains('face-left')) gait.turn = performance.now() / 1000;   // turning around
   stage.classList.toggle('pose-walk', p === 'walk'); stage.classList.toggle('pose-stand', p === 'stand');
   stage.classList.toggle('face-left', dir < 0);
   if (parts.head) parts.head.style.rotate = '';
   parts.head = p === 'rest' ? parts.headRest : parts.headWalk;
-  FPS = p === 'walk' ? 15 : ((state.settings && state.settings.gpu) ? 30 : 10);
+  if (was === 'rest' && p !== 'rest') { gait.amp = 0; gait.sx = null; gait.v = 0; gait.t = 0; }
+  FPS = p === 'walk' ? 20 : ((state.settings && state.settings.gpu) ? 30 : 10);
   if (motionTimer) { stopMotion(); startMotion(); }
 });
 
@@ -728,7 +848,7 @@ startMotion();
 
 window.otter.onState((s) => {
   if (s.settings && s.settings.motion && s.settings.motion !== motion) motion = s.settings.motion;
-  const wantFps = s.settings && s.settings.gpu ? 30 : 10;
+  const wantFps = pose === 'walk' ? 20 : (s.settings && s.settings.gpu ? 30 : 10);
   if (wantFps !== FPS) { FPS = wantFps; if (motionTimer) { stopMotion(); startMotion(); } }
   const prevIds = state.queue.map(q => q.id).join();
   state = s;
@@ -737,11 +857,20 @@ window.otter.onState((s) => {
   if (prevTreats != null && (s.treats || 0) > prevTreats) floatText(`+1 ${treatEmoji()}`);
   prevTreats = s.treats || 0;
   updateChip();
+  if (s.settings && s.settings.voices !== false && s.settings.sound !== false && CLIPS[s.settings.animal || 'otter']) setTimeout(() => { if (ctx || audio()) loadClips(s.settings.animal || 'otter'); }, 1500);
+  stage.classList.toggle('headset-on', !!s.headset || welcomeT > 0);
   if (s.alert) lastChimeFor = ids;
   if (ids !== prevIds && s.queue.length) { const pri = s.queue.findIndex(q => q.kind === 'focus' || q.kind === 'preview'); idx = pri >= 0 ? pri : s.queue.length - 1; if (s.queue.length > prevIds.split(',').filter(Boolean).length) { flashMood = null; clearTimeout(flashTimer); } } // newest reminder wins over a passing face
   render();
   clearInterval(rewiggle);
   if (s.queue.length) rewiggle = setInterval(() => { happy(); }, 120000);
+});
+// back from a game: the pet pops up with its headset on, cheers, then takes it off
+let welcomeT = 0;
+window.otter.onWelcome && window.otter.onWelcome(() => {
+  clearTimeout(welcomeT);
+  stage.classList.add('headset-on'); flash('excited', 2600); setTimeout(() => voice('happy'), 350);
+  welcomeT = setTimeout(() => { welcomeT = 0; if (!state.headset) stage.classList.remove('headset-on'); }, 4200);
 });
 window.otter.ready();
 </script>

@@ -77,13 +77,17 @@ let data = {
     focusReminders: 'badge', // 'badge' (hold until the break) | 'show'
     volume: 70, voices: true,
     quietOn: false, quietFrom: '22:00', quietTo: '08:00',
+    gaming: true,          // hide while a full-screen game is running, hold reminders until you stop
+    gameBreakMin: 120,     // nudge to take a break after this much play (0 = never)
+    bedOn: true, bedTime: '23:30',  // one bedtime warning while playing
     pos: null              // {x,y} the pet's home spot, remembered after dragging
   },
   lastNudge: 0,
   treats: 0,
   focus: { state: 'idle', endsAt: 0, round: 0, prompt: null, released: 0 },
   stats: { day: '', sessions: 0, minutes: 0 },
-  held: []                 // reminders that came due during focus (badge mode)
+  held: [],                // reminders that came due during focus (badge mode) or while gaming
+  game: { lastBreak: 0, endedAt: 0, bedWarned: '' }
 };
 let queue = [];            // ids (or 'todo-nudge') currently waiting for the user
 let pet, manager, tray;
@@ -99,6 +103,7 @@ function load() {
     data.treats = raw.treats || 0;
     data.focus = Object.assign(data.focus, raw.focus || {});
     data.stats = Object.assign(data.stats, raw.stats || {});
+    data.game = Object.assign(data.game, raw.game || {});
     data.held = (raw.held || []).filter(id => data.reminders.some(r => r.id === id));
     queue = (raw.queue || []).filter(q => q === 'todo-nudge' || data.reminders.some(r => r.id === q));
   } catch (_) {
@@ -180,6 +185,9 @@ function computeNext(r, fromMs) {
 
 function fire(id) {
   if (queue.includes(id) || data.held.includes(id)) return;
+  if (gaming && id !== 'update') {
+    data.held.push(id); log('held while gaming', id); pushManager(); save(); return;          // shown when you stop playing
+  }
   if (data.focus.state === 'focus' && data.settings.focusReminders !== 'show' && id !== 'update') {
     data.held.push(id); log('held during focus', id); pushState(false); pushManager(); save(); return;   // shows as a badge until the break
   }
@@ -249,6 +257,8 @@ function complete(id) {
   if (id === 'update') { log('installing update', upd.version); if (updater) setImmediate(() => updater.quitAndInstall(true, true)); return; }
   if (id === 'preview') return applyPreview();
   if (id === 'focus-break' || id === 'focus-next') return startFocus();   // "Skip break" / "Start"
+  if (id === 'game-break') { data.game.lastBreak = Date.now(); earnTreat('break'); return endPeek(id); }
+  if (id === 'game-bed') return endPeek(id);
   queue = queue.filter(q => q !== id);
   if (id === 'todo-nudge') { data.lastNudge = Date.now(); }
   else {
@@ -265,6 +275,8 @@ function snooze(id, mins) {
   if (id === 'update') { updDismissed = true; pushState(false); return; }
   if (id === 'preview') return cancelPreview();
   if (id === 'focus-break' || id === 'focus-next') return stopFocus();    // "Stop focusing" / "Not now"
+  if (id === 'game-break') { data.game.lastBreak = Date.now() - Math.max(0, gameBreakMs() - 20 * GMIN); return endPeek(id); }   // ask again in 20 min
+  if (id === 'game-bed') return endPeek(id);
   queue = queue.filter(q => q !== id);
   if (id === 'todo-nudge') data.lastNudge = Date.now() - (data.settings.todoNudgeMin - mins) * 60000;
   else {
@@ -349,10 +361,129 @@ function applyPreview() {
 }
 function cancelPreview() { if (!preview) return; preview = null; resizePet(); pushState(false); pushManager(); }
 
+/* ---------------- gaming mode ----------------
+   A tiny helper (native/gamecheck.exe) tells us which app is in front and whether it's full screen.
+   Full-screen / borderless apps count as games, except browsers and video players.
+   While playing: the pet hides, every reminder waits, and the pet only peeks in (headset on) for the
+   break nudge and the bedtime warning. When you stop, it comes back, cheers, then shows what waited. */
+const GMIN = Number(process.env.DP_GAME_MINUTE_MS) || 60000;             // tests shrink minutes
+const GAME_ON_MS = Number(process.env.DP_GAME_ON_MS) || 4000, GAME_OFF_MS = Number(process.env.DP_GAME_OFF_MS) || 20000;
+const NOT_GAMES = new Set(['chrome.exe', 'msedge.exe', 'firefox.exe', 'opera.exe', 'opera_gx.exe', 'brave.exe', 'vivaldi.exe', 'iexplore.exe',
+  'arc.exe', 'vlc.exe', 'mpc-hc.exe', 'mpc-hc64.exe', 'mpc-be.exe', 'mpc-be64.exe', 'potplayer.exe', 'potplayermini.exe', 'potplayermini64.exe',
+  'wmplayer.exe', 'video.ui.exe', 'microsoft.media.player.exe', 'netflix.exe', 'spotify.exe', 'kodi.exe', 'plex.exe', 'powerpnt.exe',
+  'explorer.exe', 'applicationframehost.exe', 'desktop pal.exe', 'electron.exe', 'lockapp.exe', 'searchhost.exe', 'shellexperiencehost.exe',
+  'startmenuexperiencehost.exe', 'obs64.exe', 'zoom.exe', 'teams.exe', 'ms-teams.exe', 'discord.exe']);
+let gaming = false, gameSince = 0, gameExe = '', gameProc = null, gameRaw = false, gameRawTimer = null, peeking = false, peekTimer = null, welcomeUntil = 0, gameLoopT = null;
+function gameBreakMs() { return Math.max(0, Number(data.settings.gameBreakMin) || 0) * GMIN; }
+function playedText() {
+  const m = Math.round((Date.now() - (data.game.lastBreak || gameSince)) / GMIN), h = Math.floor(m / 60);
+  return h ? `${h} hour${h > 1 ? 's' : ''}${m % 60 >= 10 ? ` ${m % 60} min` : ''}` : `${m} minutes`;
+}
+function treatEmojiFor() { return ({ otter: '🐟', cat: '🐟', dog: '🦴', fox: '🍇', redpanda: '🎋' })[data.settings.animal] || '🍪'; }
+function readProbe(line) {
+  const [q, full, exe = ''] = String(line).trim().split('|'); const e = exe.trim().toLowerCase();
+  const game = !!e && !NOT_GAMES.has(e) && q !== '4' && (q === '3' || full === '1');
+  if (e !== gameExe && (game || gaming)) log('game check', { q, full, exe: e, game });
+  gameExe = game ? e : (gaming ? gameExe : '');
+  setGameRaw(game);
+}
+function setGameRaw(game) {
+  if (game === gameRaw) return;
+  gameRaw = game; clearTimeout(gameRawTimer);
+  if (game !== gaming) gameRawTimer = setTimeout(() => { if (gameRaw === game) game ? gameStart() : gameOver(); }, game ? GAME_ON_MS : GAME_OFF_MS);
+}
+function startGameProbe() {
+  if (gameProc || data.settings.gaming === false) return;
+  const test = process.env.DP_GAME_PROBE;
+  if (test) {            // tests: a file holding a line like the helper prints
+    let last = ''; gameProc = { kill() { clearInterval(this.t); }, t: setInterval(() => { let l = ''; try { l = fs.readFileSync(test, 'utf8'); } catch (_) {} if (l !== last) { last = l; readProbe(l); } }, 300) };
+    return;
+  }
+  if (process.platform !== 'win32') return;
+  const exe = app.isPackaged ? path.join(process.resourcesPath, 'gamecheck.exe') : path.join(__dirname, '..', 'native', 'gamecheck.exe');
+  if (!fs.existsSync(exe)) { log('game check helper missing', exe); return; }
+  try {
+    const p = require('child_process').spawn(exe, [], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
+    gameProc = p; let buf = '';
+    p.stdout.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { readProbe(buf.slice(0, i)); buf = buf.slice(i + 1); } });
+    p.on('exit', (c) => { log('game check helper exited', c); if (gameProc === p) { gameProc = null; if (data.settings.gaming !== false && !app.isQuitting) setTimeout(startGameProbe, 30000); } });
+    p.on('error', (e) => log('game check helper failed', String(e)));
+    log('game check started');
+  } catch (e) { log('game check spawn failed', String(e)); }
+}
+function stopGameProbe() { if (gameProc) { const p = gameProc; gameProc = null; try { p.stdin && p.stdin.end(); p.kill(); } catch (_) {} } gameRaw = false; clearTimeout(gameRawTimer); }
+function gameStart() {
+  if (gaming) return;
+  gaming = true; gameSince = Date.now();
+  if (!data.game.endedAt || Date.now() - data.game.endedAt > 10 * GMIN) data.game.lastBreak = gameSince;   // a fresh session (a short alt-tab doesn't count as a break)
+  log('gaming mode on', gameExe);
+  stopWalk(); clearTimeout(walkTimer);
+  if (pet && !pet.isDestroyed() && pet.isVisible()) pet.hide();
+  clearInterval(gameLoopT); gameLoopT = setInterval(gameLoop, Math.min(30000, GMIN / 2));
+  save(); updateCalm(); pushManager(); rebuildTray();
+}
+function gameOver() {
+  if (!gaming) return;
+  gaming = false; clearInterval(gameLoopT); clearTimeout(peekTimer);
+  queue = queue.filter(q => !q.startsWith('game-')); peeking = false;
+  data.game.endedAt = Date.now();
+  log('gaming mode off after', Math.round((Date.now() - gameSince) / 60000), 'min');
+  welcomeUntil = Date.now() + 4200;
+  showPet();
+  if (pet && !pet.isDestroyed()) pet.webContents.send('welcome');
+  pushState(false);
+  // let the pet say hi first, then show what waited (unless focus is still holding them)
+  setTimeout(() => {
+    welcomeUntil = 0;
+    const n = (data.focus.state === 'focus' && data.settings.focusReminders !== 'show') ? 0 : releaseHeld();
+    log('released after gaming', n);
+    save(); pushState(n > 0); pushManager(); rebuildTray(); if (!n) scheduleWalk();
+  }, 3000);
+  save(); updateCalm(); pushManager(); rebuildTray();
+}
+function bedtimeKey(now) {          // the evening this bedtime belongs to, if we're past it (up to 6 hours after)
+  const bt = hm(data.settings.bedTime || '23:30'); const d = new Date(now);
+  for (const back of [0, 1]) {
+    const day = new Date(d); day.setDate(d.getDate() - back);
+    const t = atMinutes(day, bt);
+    if (now >= t && now - t < 6 * 3600000) return day.toDateString();
+  }
+  return null;
+}
+function gameLoop() {
+  if (!gaming || peeking) return;
+  const now = Date.now();
+  if (data.settings.bedOn !== false) {
+    const k = bedtimeKey(now);
+    if (k && data.game.bedWarned !== k) { data.game.bedWarned = k; return peek('game-bed'); }
+  }
+  const brk = gameBreakMs();
+  if (brk && now - (data.game.lastBreak || gameSince) >= brk) peek('game-break');
+}
+function peek(id) {
+  if (!pet || pet.isDestroyed()) return;
+  peeking = true; queue = queue.filter(q => q !== id); queue.unshift(id);
+  log('peek', id);
+  pet.showInactive(); pet.setAlwaysOnTop(true, 'screen-saver'); pet.moveTop();   // never takes focus from the game
+  updateCalm(); pushState(true); save();
+  clearTimeout(peekTimer);
+  peekTimer = setTimeout(() => {                 // nobody clicked: tuck away again (the break nudge asks again in 20 min)
+    if (id === 'game-break') data.game.lastBreak = Date.now() - Math.max(0, gameBreakMs() - 20 * GMIN);
+    endPeek(id);
+  }, Number(process.env.DP_PEEK_MS) || 12000);
+}
+function endPeek(id) {
+  clearTimeout(peekTimer);
+  queue = queue.filter(q => q !== id); peeking = false;
+  pushState(false); save();
+  if (gaming && pet && !pet.isDestroyed()) setTimeout(() => { if (gaming && !peeking) { pet.hide(); updateCalm(); } }, 1600);
+  else afterQueue();
+}
+
 /* ---------------- walking along the bottom of the screen ---------------- */
-const WALK_SPEED = 55;                                          // px per second
+const WALK_SPEED = 52;                                          // px per second at 100% pet size
 const WALK_SCALE = Number(process.env.DP_WALK_SCALE) || 1;     // tests shorten the waits
-let walkPose = 'rest', walkDir = 1, walkMover = null, walkTimer = null;
+let walkPose = 'rest', walkDir = 1, walkMover = null, walkTimer = null, walkPause = null;
 function homePos() { return data.settings.pos || defaultPos(); }
 function setPose(p, dir) {
   walkPose = p; if (dir) walkDir = dir;
@@ -360,7 +491,7 @@ function setPose(p, dir) {
 }
 function canWalk() {
   return pet && !pet.isDestroyed() && pet.isVisible() && calmSent === false && !queue.length && !dragStart && !preview &&
-    data.focus.state !== 'focus' && (data.settings.walk || 'sometimes') !== 'off';
+    !gaming && data.focus.state !== 'focus' && (data.settings.walk || 'sometimes') !== 'off';
 }
 function scheduleWalk(ms) {
   clearTimeout(walkTimer);
@@ -381,25 +512,40 @@ function tryWalk() {
       if (Math.abs(t - b.x) >= 120) { target = t; break; }
     }
   }
+  // on longer strolls, sometimes stop halfway to stand and look around for a moment
+  if (Math.abs(target - b.x) > 260 && Math.random() < 0.4) {
+    const mid = Math.round(b.x + (target - b.x) * (0.35 + Math.random() * 0.3));
+    return walkTo(mid, () => { walkPause = setTimeout(() => { walkPause = null; canWalk() ? walkTo(target, () => scheduleWalk()) : scheduleWalk(); }, (1500 + Math.random() * 2000) / Math.sqrt(WALK_SCALE)); });
+  }
   walkTo(target, () => scheduleWalk());
 }
+// smooth, time-based movement: speeds up gently, cruises, and slows down before stopping
 function walkTo(x, then) {
   if (!pet || pet.isDestroyed()) return;
-  clearInterval(walkMover);
+  clearInterval(walkMover); walkMover = null; clearTimeout(walkPause); walkPause = null;
   const b = pet.getBounds(); const y = b.y;
   if (Math.abs(x - b.x) < 2) { setPose(atHome() ? 'rest' : 'stand'); return then && then(); }
-  setPose('walk', x > b.x ? 1 : -1);
-  let cx = b.x;
+  // give the pet a moment to get up (from resting) or turn around before it sets off
+  const nd = x > b.x ? 1 : -1, wait = (walkPose === 'rest' ? 380 : 0) + (walkPose !== 'rest' && nd !== walkDir ? 430 : 0);
+  setPose('walk', nd);
+  const vmax = WALK_SPEED * clamp(Number(data.settings.size) || 1, 0.5, 1.5) * (0.92 + Math.random() * 0.16);
+  const acc = vmax / 0.6, dir = Math.sign(x - b.x);
+  let cx = b.x, v = 0, last = Date.now() + wait, lastPx = b.x;
   walkMover = setInterval(() => {
-    if (!pet || pet.isDestroyed()) return clearInterval(walkMover);
-    const step = WALK_SPEED / 20;
-    cx = Math.abs(x - cx) <= step ? x : cx + Math.sign(x - cx) * step;
-    pet.setPosition(Math.round(cx), y);
+    if (!pet || pet.isDestroyed()) { clearInterval(walkMover); walkMover = null; return; }
+    if (Date.now() < last) return;
+    const now = Date.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const rem = Math.abs(x - cx);
+    v = Math.min(v + acc * dt, vmax, Math.sqrt(2 * acc * rem) + 4);
+    cx = rem <= v * dt ? x : cx + dir * v * dt;
+    const px = Math.round(cx);
+    if (px !== lastPx) { pet.setPosition(px, y); lastPx = px; }
     if (cx === x) { clearInterval(walkMover); walkMover = null; setPose(atHome() ? 'rest' : 'stand'); then && then(); }
-  }, 50);
+  }, 16);
 }
 function atHome() { if (!pet || pet.isDestroyed()) return true; const b = pet.getBounds(), h = homePos(); return Math.abs(b.x - h.x) <= 4 && Math.abs(b.y - h.y) <= 4; }
 function stopWalk() {
+  if (walkPause) { clearTimeout(walkPause); walkPause = null; }
   if (walkMover) { clearInterval(walkMover); walkMover = null; setPose(atHome() ? 'rest' : 'stand'); }
 }
 function walkHome() {
@@ -446,6 +592,10 @@ function petState() {
       ? { id, kind: 'focus', title: `Break time! ${data.focus.breakLen || focusLens().short} min${data.focus.long ? ' (long break)' : ''}`, note: 'Stretch, look away from the screen, sip some water.' + (data.focus.released ? ` ${data.focus.released} reminder${data.focus.released > 1 ? 's' : ''} waited for you.` : ''), mood: 'happy', doneLabel: 'Skip break', laterLabel: 'Stop focusing' }
       : id === 'focus-next'
       ? { id, kind: 'focus', title: `Break's over! Ready for round ${(data.focus.round || 0) + 1}?`, note: `${focusLens().focus} minutes of focus.`, mood: 'excited', doneLabel: 'Start', laterLabel: 'Not now' }
+      : id === 'game-break'
+      ? { id, kind: 'game', title: `You've been playing for ${playedText()}`, note: 'Time for a short break: stand up, stretch and drink some water. Your game will wait!', mood: 'happy', doneLabel: `Taking a break ${treatEmojiFor()}`, laterLabel: 'Later' }
+      : id === 'game-bed'
+      ? { id, kind: 'game', title: `It's ${data.settings.bedTime || '23:30'}, getting late!`, note: 'Maybe one more match, then off to bed?', mood: 'sleepy', doneLabel: 'OK', laterLabel: 'Not tonight' }
       : id === 'todo-nudge'
       ? { id, kind: 'nudge', title: 'You still have things on your list', todos: openTodos().slice(0, 5).map(t => t.title), more: Math.max(0, openTodos().length - 5) }
       : (() => { const r = data.reminders.find(x => x.id === id); return r && { id, kind: r.type, title: r.title, note: r.note, mood: r.mood || 'auto', overdue: r.type === 'once' && r.at && new Date(r.at).getTime() < Date.now() - 5 * 60000 ? r.at : null }; })()
@@ -456,7 +606,8 @@ function petState() {
     todos: openTodos().length,
     settings: eff(),
     treats: data.treats || 0,
-    focus: { state: data.focus.state, endsAt: data.focus.endsAt, round: data.focus.round, held: data.held.length, lens: focusLens() }
+    focus: { state: data.focus.state, endsAt: data.focus.endsAt, round: data.focus.round, held: data.held.length, lens: focusLens() },
+    headset: peeking || welcomeUntil > Date.now()
   };
 }
 let lastStateJson = '', stateSends = 0, stateSkips = 0;
@@ -471,7 +622,8 @@ function pushManager() { if (manager && !manager.isDestroyed()) manager.webConte
 function managerData() {
   if (data.stats.day !== today()) data.stats = { day: today(), sessions: 0, minutes: 0 };
   return { reminders: data.reminders, settings: data.settings, queue, update: upd, treats: data.treats || 0,
-           focus: { ...data.focus, held: data.held.length, lens: focusLens() }, stats: data.stats, previewing: !!preview };
+           focus: { ...data.focus, held: data.held.length, lens: focusLens() }, stats: data.stats, previewing: !!preview,
+           gaming: { on: gaming, exe: gameExe, since: gameSince, probe: !!gameProc || !!process.env.DP_GAME_PROBE } };
 }
 
 /* ---------------- windows ---------------- */
@@ -532,6 +684,7 @@ function resizePet() {
 function showPet() {
   if (!pet || pet.isDestroyed()) return;
   if (Date.now() < hiddenUntil) return;
+  if (gaming && !peeking) return;                 // stays out of the way while you play
   if (!pet.isVisible()) pet.showInactive();
   pet.setAlwaysOnTop(true, 'screen-saver');
   pet.moveTop();
@@ -566,6 +719,8 @@ function rebuildTray() {
       ? { label: `Start focus (${focusLens().focus} min)`, click: () => startFocus() }
       : { label: 'Stop focus', click: () => stopFocus() },
     ...((data.settings.walk || 'sometimes') !== 'off' ? [{ label: 'Go for a walk', click: () => { if (canWalk()) tryWalk(); } }] : []),
+    { label: gaming ? `Gaming mode (playing${gameExe ? ' ' + gameExe.replace(/\.exe$/, '') : ''})` : 'Gaming mode', type: 'checkbox', checked: data.settings.gaming !== false,
+      click: (mi) => { data.settings.gaming = mi.checked; if (mi.checked) startGameProbe(); else { stopGameProbe(); if (gaming) gameOver(); } save(); pushManager(); rebuildTray(); } },
     { label: data.settings.sound ? 'Mute sounds' : 'Unmute sounds', click: () => { data.settings.sound = !data.settings.sound; save(); pushState(false); pushManager(); rebuildTray(); } },
     { label: 'Add a reminder…', click: () => openManager('new') },
     { type: 'separator' },
@@ -625,6 +780,11 @@ ipcMain.on('pet:done', (_e, id) => complete(id));
 ipcMain.on('pet:snooze', (_e, id, mins) => snooze(id, mins));
 ipcMain.on('pet:open', (_e, tab) => openManager(tab));
 ipcMain.on('pet:hide', (_e, mins) => hidePet(mins));
+// animal voices: small recorded clips, loaded only for the animal you picked
+ipcMain.handle('pet:sound', (_e, name) => {
+  if (!/^[a-z]+-[a-z]+\d?$/.test(String(name))) return null;
+  try { return fs.readFileSync(path.join(__dirname, 'sounds', name + '.ogg')); } catch (_) { return null; }
+});
 ipcMain.on('pet:ready', () => { calmSent = null; lastStateJson = ''; pushState(queue.length > 0); updateCalm(); setPose(walkPose); });
 ipcMain.handle('pet:feed', () => { if ((data.treats || 0) < 1) return false; data.treats--; save(); pushState(false); pushManager(); return true; });
 ipcMain.on('pet:focus', (_e, on) => on ? startFocus() : stopFocus());
@@ -679,7 +839,8 @@ ipcMain.handle('mgr:settings', (_e, s) => {
   data.settings = Object.assign(data.settings, s);
   if (resize) resizePet();
   if (walkChanged) { if (s.walk === 'off') { clearTimeout(walkTimer); stopWalk(); walkHome(); } else scheduleWalk(); }
-  if (s.focusReminders === 'show' && data.held.length) { releaseHeld(); pushState(true); }
+  if (s.focusReminders === 'show' && data.held.length && !gaming) { releaseHeld(); pushState(true); }
+  if ('gaming' in s) { if (s.gaming) startGameProbe(); else { stopGameProbe(); if (gaming) gameOver(); } }
   applyLogin(); save(); pushState(false); pushManager(); rebuildTray();
   if (gpuChanged) {               // drawing mode is fixed at startup: restart to apply
     try { fs.writeFileSync(DATA_FILE(), JSON.stringify({ ...data, queue }, null, 2)); } catch (_) {}
@@ -700,6 +861,7 @@ ipcMain.handle('mgr:test', () => { fire(data.reminders.find(r => r.type !== 'tod
 
 /* ---------------- boot ---------------- */
 app.on('second-instance', (_e, argv) => { if (!argv.includes('--relaunched')) openManager(); });
+app.on('will-quit', () => stopGameProbe());
 app.on('will-quit', () => log('state updates sent', stateSends, 'skipped (no change)', stateSkips));
 app.on('window-all-closed', (e) => { /* keep running in tray */ });
 
@@ -775,6 +937,10 @@ app.whenReady().then(async () => {
   if (data.focus.state === 'focus' || data.focus.state === 'break') scheduleFocus();
   else if (data.focus.state === 'ready' && !queue.includes('focus-next')) queue.unshift('focus-next');
   scheduleWalk();
+  data.game.endedAt = data.game.endedAt || 0;
+  startGameProbe();
+  // reminders still waiting from a game that ended while the app was closed
+  setTimeout(() => { if (!gaming && data.held.length && data.focus.state !== 'focus') { releaseHeld(); save(); pushState(true); pushManager(); } }, (GAME_ON_MS * 2) + 2000);
   if (firstRun) setTimeout(() => openManager(), 1500);
   if (process.env.OTTER_DEMO) setTimeout(() => fire(data.reminders[0].id), 1200);
 });

@@ -28,8 +28,9 @@ Installed copies update themselves: when a new release is published here, your p
 - **Nine facial expressions:** picked automatically from the reminder's wording, or chosen by you
 - **Focus timer:** 25/5, 50/10, 90/15 or your own lengths; reminders wait as a badge until your break (or keep showing, your choice)
 - **Walks around:** your pet strolls along the bottom of the screen now and then and walks back home (Off / Sometimes / Often)
+- **Gaming mode:** when a full-screen game is running, your pet hides and reminders wait until you stop. It peeks in (wearing a headset) to suggest a break every couple of hours, and once at bedtime
 - **Petting and treats:** stroke your pet with the mouse; finishing reminders and focus sessions earns treats to feed it
-- **Animal voices:** a soft purr, bark, squeak or yip, with volume control and quiet hours
+- **Animal voices:** real recordings of a purring cat, a barking dog, a calling fox and a chirping otter (see `src/sounds/CREDITS.md`), with volume control and quiet hours
 - **Stays out of the way:** clicks pass through around the pet, drag it anywhere, hide it for a while
 - **Light on your PC:** animations run at 10 fps and pause while you're away or the screen is locked
 - **Private:** everything stays on your computer, with no account and no data collected
@@ -43,6 +44,7 @@ npm install
 npm start              # run the app
 npm test               # scheduler unit tests (set TZ=Europe/Sofia for the clock-change cases)
 npm run test:e2e       # end-to-end tests (needs a display, e.g. xvfb-run)
+# native/gamecheck.exe: x86_64-w64-mingw32-gcc -O2 -s -municode -mwindows native/gamecheck.c -o native/gamecheck.exe -lshell32
 npm run build:art      # regenerate src/pet.html and src/pets/*.json from tools/ (Python + matplotlib)
 npm run dist           # build the Windows installer into dist/
 ```
@@ -58,6 +60,8 @@ A Windows machine builds the installer and publishes it as a release. Installed 
 | `src/pet.html` | The pet window (bubble, expressions, motion engine) |
 | `src/pets/*.json` | Artwork for each animal, loaded on demand |
 | `src/manager.html` | The reminders/settings window |
+| `src/sounds/` | Animal voice clips and their credits |
+| `native/gamecheck.c` | Tiny Windows helper that tells the app when a full-screen game is in front |
 | `tools/` | Art generator, screenshot scripts, tests, performance tools |
 | `.github/workflows/release.yml` | Builds and publishes releases |
 

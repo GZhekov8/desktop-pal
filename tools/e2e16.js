@@ -124,6 +124,11 @@ const bounds = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAll
   ok('voices play without errors for every animal', await pet.evaluate(async () => {
     for (const a of ['otter', 'cat', 'dog', 'fox', 'redpanda']) { state.settings.animal = a; for (const k of ['pet', 'happy', 'call']) voice(k); }
     munch(); chime(); return true; }));
+  ok('recorded voices load and decode for every animal', !!(await until(() => pet.evaluate(() => {
+    for (const a of ['otter', 'cat', 'dog', 'fox']) loadClips(a);
+    return Object.keys(clipBufs).length === 14 && Object.values(clipBufs).every(b => b.duration > .2 && b.duration < 2);
+  }), 8000)), await pet.evaluate(() => Object.keys(clipBufs).length + ' clips'));
+  ok('recorded voice actually plays', await pet.evaluate(() => { state.settings.animal = 'cat'; return playClip('cat-call', .5); }));
   ok('no page errors (sounds)', errors.length === 0, errors.slice(0, 2).join(' | '));
   await app.close();
 

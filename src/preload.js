@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('otter', {
   onCalm: (cb) => ipcRenderer.on('calm', (_e, v) => cb(v)),
   onCursor: (cb) => ipcRenderer.on('cursor', (_e, c) => cb(c)),
   onPose: (cb) => ipcRenderer.on('pose', (_e, p) => cb(p)),
+  sound: (name) => ipcRenderer.invoke('pet:sound', name),
+  onWelcome: (cb) => ipcRenderer.on('welcome', () => cb()),
   feed: () => ipcRenderer.invoke('pet:feed'),
   focus: (on) => ipcRenderer.send('pet:focus', on),
   ignore: (v) => ipcRenderer.send('pet:ignore', v),
