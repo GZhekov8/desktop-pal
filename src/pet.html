@@ -10,15 +10,16 @@
   }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none;
     font-family: "Segoe UI", system-ui, sans-serif; }
-  .stage { position: absolute; right: 0; bottom: 0; width: 340px; height: 470px; transform-origin: 100% 100%; }
+  .stage { position: absolute; right: 0; bottom: 0; width: 100%; height: 100%; --pet: 1; --text: 1; }
 
   /* ---------- speech bubble ---------- */
-  #bubble { position: absolute; right: 18px; bottom: 182px; width: 270px; background: var(--paper); color: var(--ink);
+  /* the bubble has its own text size (--text) and always sits just above the pet (--pet) */
+  #bubble { position: absolute; zoom: var(--text); right: calc(18px / var(--text)); bottom: calc((170px * var(--pet) + 12px) / var(--text)); width: 270px; background: var(--paper); color: var(--ink);
     border-radius: 16px; padding: 14px 16px 12px; box-shadow: 0 6px 22px rgba(30,20,10,.28), 0 0 0 1.5px rgba(90,55,30,.18);
     opacity: 0; transform: translateY(10px) scale(.96); transform-origin: 80% 100%; pointer-events: none;
     transition: opacity .22s ease, transform .22s ease; }
   #bubble.show { opacity: 1; transform: none; pointer-events: auto; }
-  #bubble::after { content: ""; position: absolute; right: 64px; bottom: -11px; width: 22px; height: 22px; background: var(--paper);
+  #bubble::after { content: ""; position: absolute; right: calc(max(26px, 64px * var(--pet)) / var(--text)); bottom: -11px; width: 22px; height: 22px; background: var(--paper);
     transform: rotate(45deg); border-radius: 0 0 5px 0; box-shadow: 3px 3px 4px rgba(30,20,10,.12); }
   .b-head { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #8a6a52;
     letter-spacing: .02em; margin-bottom: 4px; }
@@ -43,7 +44,7 @@
   .next-row span:last-child { color: #8a6a52; white-space: nowrap; }
 
   /* ---------- otter ---------- */
-  #otterWrap { position: absolute; right: 6px; bottom: 0; width: 240px; height: 170px; cursor: grab; }
+  #otterWrap { position: absolute; right: 6px; bottom: 0; width: 240px; height: 170px; cursor: grab; transform: scale(var(--pet)); transform-origin: 100% 100%; }
   #otterWrap.dragging { cursor: grabbing; }
   .layer { position: absolute; inset: 0; width: 100%; height: 100%; }
   svg { width: 100%; height: 100%; overflow: visible; display: block; }
@@ -86,7 +87,26 @@
   .m-worried  :is(.x-eyes-open,.x-brows-worried,.x-mouth-frown,.x-sweat),
   .m-sleepy   :is(.x-eyes-sleepy,.x-mouth-yawn,.x-zzz),
   .m-love     :is(.x-eyes-happy,.x-mouth-smile,.x-blush,.x-hearts),
-  .m-proud    :is(.x-eyes-happy,.x-brows-up,.x-mouth-smile,.x-blush,.x-sparkle) { opacity: 1; }
+  .m-proud    :is(.x-eyes-happy,.x-brows-up,.x-mouth-smile,.x-blush,.x-sparkle),
+  .m-yawn     :is(.x-eyes-sleepy,.x-mouth-yawn),
+  .m-neutral.perk :is(.x-eyes-wide,.x-brows-up,.x-mouth-neutral) { opacity: 1; }
+  .m-neutral.perk .x-eyes-open { opacity: 0; }
+
+  /* ---------- liveliness: idle actions + following the mouse ---------- */
+  .head { transform-box: fill-box; transform-origin: 50% 85%; transition: rotate .35s ease-out; }
+  .x-eyes-open, .x-eyes-wide, .iris { transition: translate .25s ease-out, opacity .25s ease; }
+  .look .head { animation: lookAround 2.6s ease-in-out; }
+  .look :is(.x-eyes-open, .x-eyes-wide, .iris) { animation: eyesLook 2.6s ease-in-out; }
+  @keyframes lookAround { 0%,100% { rotate: 0deg; } 18%,42% { rotate: -9deg; } 60%,84% { rotate: 7deg; } }
+  @keyframes eyesLook { 0%,100% { translate: 0 0; } 18%,42% { translate: -1.6px 0; } 60%,84% { translate: 1.6px 0; } }
+  .tilt .head { animation: tilt 2.2s ease-in-out; }
+  @keyframes tilt { 0%,100% { rotate: 0deg; } 25%,70% { rotate: 11deg; } }
+  .float > svg { transform-origin: 35% 80%; }
+  .stretch .float > svg { animation: stretch 1.9s ease-in-out; }
+  @keyframes stretch { 0%,100% { transform: none; } 40%,62% { transform: scale(1.04, .975); } }
+  .swish .alert-tail { animation: wag .45s ease-in-out 4 alternate; }
+  .swish .feet { animation: flipperWave .5s ease-in-out 4 alternate; }
+  @keyframes flipperWave { from { transform: rotate(-5deg); } to { transform: rotate(9deg); } }
   .sweat { transform-box: fill-box; }
   .m-worried .sweat { animation: sweat 1.6s ease-in infinite; }
   @keyframes sweat { 0% { transform: translateY(-2px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(6px); opacity: 0; } }
@@ -369,7 +389,8 @@ function render() {
   applyMood();
   stage.classList.toggle('has-todos', state.todos > 0 && !state.queue.length);
   $('#badgeTxt').textContent = state.todos > 9 ? '9+' : state.todos;
-  stage.style.transform = `scale(${state.settings.size || 1})`;
+  stage.style.setProperty('--pet', Math.min(1.5, Math.max(0.5, Number(state.settings.size) || 1)));
+  stage.style.setProperty('--text', Math.min(1.5, Math.max(0.8, Number(state.settings.textSize) || 1)));
 
   if (state.queue.length) mode = 'alert';
   else if (mode === 'alert') mode = 'none';
@@ -465,9 +486,11 @@ function chime() {
    Measured: every frame costs about the same in software drawing, and the motions are slow enough
    that 10 fps looks smooth. */
 let FPS = 10;
-let motionTimer = null, calm = false, motion = 'lively', parts = { float: null, w1: [], w2: [], rip: [] };
+let motionTimer = null, calm = false, motion = 'lively', parts = { float: null, w1: [], w2: [], rip: [], head: null, eyes: [] };
 function collectParts() {
   parts.float = document.querySelector('.float');
+  parts.head = document.querySelector('#slot-float .head');
+  parts.eyes = [...document.querySelectorAll('#slot-float .x-eyes-open, #slot-float .x-eyes-wide, #slot-float .iris')];
   parts.w1 = [...document.querySelectorAll('.water1')];
   parts.w2 = [...document.querySelectorAll('.water2')];
   parts.rip = [...document.querySelectorAll('.ripple')];
@@ -487,7 +510,7 @@ function frame() {
 }
 function startMotion() { if (!motionTimer && !calm) motionTimer = setInterval(frame, 1000 / FPS); }
 function stopMotion() { clearInterval(motionTimer); motionTimer = null; }
-function setCalm(v) { calm = v; stage.classList.toggle('calm', v); v ? stopMotion() : startMotion(); }
+function setCalm(v) { calm = v; stage.classList.toggle('calm', v); v ? stopMotion() : startMotion(); if (v) follow(null); }
 // blinking and the odd flipper/paw flex, on their own relaxed timers
 (function blinkLoop() {
   if (!calm) { stage.classList.add('blink'); setTimeout(() => stage.classList.remove('blink'), 130);
@@ -499,6 +522,34 @@ function setCalm(v) { calm = v; stage.classList.toggle('calm', v); v ? stopMotio
   setTimeout(flexLoop, 9000 + Math.random() * 6000);
 })();
 window.otter.onCalm && window.otter.onCalm(setCalm);
+
+// idle actions: every 20-60 s the pet does something small, then relaxes
+const ACTIONS = { look: 2700, tilt: 2300, stretch: 2000, swish: 2000, yawn: 1900 };
+let lastAction = '';
+function idleAction() {
+  const busy = calm || motion === 'calm' || mode !== 'none' || flashMood || stage.classList.contains('alert') || !parts.head;
+  if (busy) return;
+  const names = Object.keys(ACTIONS).filter(a => a !== lastAction);
+  const a = names[Math.floor(Math.random() * names.length)]; lastAction = a;
+  if (a === 'yawn') { flash('yawn', ACTIONS.yawn); return; }
+  stage.classList.add(a); setTimeout(() => stage.classList.remove(a), ACTIONS[a]);
+}
+(function idleLoop() { idleAction(); setTimeout(idleLoop, 20000 + Math.random() * 40000); })();
+
+// following the mouse: the app sends the cursor position (relative to this window) when it's near
+const clampN = (v, a) => Math.max(-a, Math.min(a, v));
+function follow(c) {
+  if (!parts.head) return;
+  if (!c) { parts.head.style.rotate = ''; parts.eyes.forEach(e => e.style.translate = ''); stage.classList.remove('perk'); return; }
+  const h = parts.head.getBoundingClientRect(), cx = h.left + h.width / 2, cy = h.top + h.height / 2;
+  const vx = c.x - cx, vy = c.y - cy;
+  parts.head.style.rotate = clampN(vx / 40, 8).toFixed(1) + 'deg';
+  const ex = clampN(vx / 90, 1) * 1.6, ey = clampN(vy / 90, 1) * 1.2;
+  parts.eyes.forEach(e => e.style.translate = `${ex.toFixed(2)}px ${ey.toFixed(2)}px`);
+  const w = wrap.getBoundingClientRect();
+  stage.classList.toggle('perk', c.x >= w.left && c.x <= w.right && c.y >= w.top && c.y <= w.bottom);
+}
+window.otter.onCursor && window.otter.onCursor((c) => { if (!calm) follow(c); });
 // the app only sends updates when something changes, so keep time-based bits (night face, "in 5 min") fresh here
 setInterval(() => { if (!calm) { applyMood(); if (mode === 'peek') { lastHTML = ''; render(); } } }, 60000);
 startMotion();

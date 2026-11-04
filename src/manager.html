@@ -63,6 +63,9 @@
   .set .r:last-child { border-bottom: 0; }
   .set .r small { display: block; color: var(--muted); }
   .set .r input, .set .r select { width: 160px; }
+  .rng { display: flex; align-items: center; gap: 10px; }
+  .rng input[type=range] { width: 170px; accent-color: var(--accent); }
+  .rng output { width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
   .hidden { display: none !important; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .chips button { border: 1px solid #d8cabb; background: #fff; border-radius: 99px; padding: 4px 10px; cursor: pointer; font: 12px "Segoe UI"; }
@@ -107,7 +110,8 @@
         <option value="otter">Sea otter</option><option value="cat">Ginger cat</option><option value="dog">Dog</option><option value="fox">Red fox</option><option value="redpanda">Red panda</option>
       </select></div>
       <div class="r"><div>Pet's name<small>Shown in its speech bubble</small></div><input type="text" id="s-petName" maxlength="20"></div>
-      <div class="r"><div>Pet size</div><select id="s-size"><option value="0.75">Small</option><option value="1">Normal</option><option value="1.25">Large</option></select></div>
+      <div class="r"><div>Pet size<small>How big your pet is on screen</small></div><div class="rng"><input type="range" id="s-size" min="50" max="150" step="5"><output id="o-size">100%</output></div></div>
+      <div class="r"><div>Text size<small>Size of the speech bubble, so reminders stay readable even with a small pet</small></div><div class="rng"><input type="range" id="s-textSize" min="80" max="150" step="5"><output id="o-textSize">100%</output></div></div>
       <div class="r"><div>Motion<small>Lively: gently bobs and breathes. Calm: stays still apart from blinking (uses the least power).</small></div><select id="s-motion"><option value="lively">Lively</option><option value="calm">Calm</option></select></div>
       <div class="r"><div>Use graphics card<small>Smoother and lighter on the processor. If your pet disappears, turn this off again (from the tray icon → Open Desktop Pal). The app restarts to apply it.</small></div><label class="switch"><input type="checkbox" id="s-gpu"><span></span></label></div>
       <div class="r"><div>Play a chime<small>Soft three-note sound when something is due</small></div><label class="switch"><input type="checkbox" id="s-sound"><span></span></label></div>
@@ -242,18 +246,28 @@ function render() {
   // settings
   const s = D.settings;
   for (const k of ['petName','snoozeDefault','todoNudgeMin']) { const el = $('#s-' + k); if (document.activeElement !== el) el.value = s[k]; }
-  $('#s-size').value = String(s.size);
+  for (const k of ['size', 'textSize']) {
+    const el = $('#s-' + k), v = Math.round((Number(s[k]) || 1) * 100);
+    if (document.activeElement !== el) { el.value = v; $('#o-' + k).textContent = v + '%'; }
+  }
   $('#s-animal').value = s.animal || 'otter';
   $('#s-motion').value = s.motion || 'lively';
   $('#s-gpu').checked = !!s.gpu;
   for (const k of ['sound','notifications','startWithWindows']) $('#s-' + k).checked = !!s[k];
 }
-for (const k of ['petName','snoozeDefault','todoNudgeMin','size','animal','motion']) $('#s-' + k).onchange = (e) => {
+for (const k of ['petName','snoozeDefault','todoNudgeMin','animal','motion']) $('#s-' + k).onchange = (e) => {
   const v = k === 'petName' ? (e.target.value.trim() || 'Ollie') : (k === 'animal' || k === 'motion') ? e.target.value : Number(e.target.value);
   window.otter.settings({ [k]: v });
 };
 for (const k of ['sound','notifications','startWithWindows','gpu']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: e.target.checked });
 $('#testBtn').onclick = () => window.otter.test();
+// size sliders: live preview while dragging (throttled), 5% steps
+for (const k of ['size', 'textSize']) {
+  const el = $('#s-' + k); let t = null;
+  const send = () => window.otter.settings({ [k]: Number(el.value) / 100 });
+  el.oninput = () => { $('#o-' + k).textContent = el.value + '%'; clearTimeout(t); t = setTimeout(send, 60); };
+  el.onchange = () => { clearTimeout(t); send(); };
+}
 const UPD = { idle: 'Up to date', latest: 'Up to date', checking: 'Checking for updates…', error: "Couldn't check for updates right now", ready: 'An update is ready' };
 let ABOUT = { version: '', page: '', canUpdate: false };
 function paintAbout(u) {

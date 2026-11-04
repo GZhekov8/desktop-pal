@@ -1,6 +1,6 @@
 {
   "name": "desktop-pal",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A desktop pet that sits in the corner of your screen and reminds you of things",
   "main": "src/main.js",
   "scripts": {
@@ -22,7 +22,7 @@
     "resedit": "^3.1.0"
   },
   "productName": "Desktop Pal",
-  "homepage": "",
+  "homepage": "https://github.com/GZhekov8/desktop-pal/releases",
   "build": {
     "appId": "com.otterpal.reminders",
     "productName": "Desktop Pal",
@@ -89,6 +89,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/OWNER/desktop-pal"
+    "url": "https://github.com/GZhekov8/desktop-pal"
   }
 }

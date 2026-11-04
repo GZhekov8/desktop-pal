@@ -45,7 +45,18 @@ s = s[:a] + '<g id="slot-front"></g>\n' + s[b:]
 import json, os, re
 os.makedirs(ROOT + '/src/pets', exist_ok=True)
 squeeze = lambda t: re.sub(r'>\s+<', '><', t).strip()
+def wrap_head(f):
+    # wrap the head group in an outer <g class="head"> (no transform of its own) so CSS can turn the
+    # head around its real position; the inner group keeps its translate/rotate placement
+    i = f.index('<g transform="translate(19')
+    depth, j = 0, i
+    for m in re.finditer(r'<g[\s>]|</g>', f[i:]):
+        depth += -1 if m.group(0) == '</g>' else 1
+        if depth == 0: j = i + m.end(); break
+    return f[:i] + '<g class="head">' + f[i:j] + '</g>' + f[j:]
+
 for name, parts in art.items():
+    parts['float'] = wrap_head(parts['float'])
     json.dump({k: squeeze(v) for k, v in parts.items()}, open(f'{ROOT}/src/pets/{name}.json', 'w'), separators=(',', ':'))
 
 # 5. css

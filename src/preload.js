@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('otter', {
   // pet window
   onState: (cb) => ipcRenderer.on('state', (_e, s) => cb(s)),
   onCalm: (cb) => ipcRenderer.on('calm', (_e, v) => cb(v)),
+  onCursor: (cb) => ipcRenderer.on('cursor', (_e, c) => cb(c)),
   ignore: (v) => ipcRenderer.send('pet:ignore', v),
   done: (id) => ipcRenderer.send('pet:done', id),
   snooze: (id, m) => ipcRenderer.send('pet:snooze', id, m),

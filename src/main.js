@@ -48,7 +48,12 @@ function restartSelf() {
 }
 
 const DATA_FILE = () => path.join(app.getPath('userData'), 'otterpal-data.json');
-const PET_W = 340, PET_H = 470;
+// The pet window fits the pet (50-150%) plus a speech bubble whose text size is set separately (80-150%).
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+function petDims(s = data.settings) {
+  const pet = clamp(Number(s.size) || 1, 0.5, 1.5), text = clamp(Number(s.textSize) || 1, 0.8, 1.5);
+  return { w: Math.ceil(Math.max(302 * text + 28, 246 * pet + 10)), h: Math.ceil(170 * pet + 12 + 300 * text) };
+}
 
 let data = {
   reminders: [],
@@ -196,6 +201,19 @@ function tick() {
 /* pause all animation while nobody is looking: screen locked, away for 3+ min, or pet hidden */
 let locked = false, calmSent = null;
 const CALM_AFTER = Number(process.env.DP_CALM_AFTER) || 180; // seconds without mouse/keyboard
+/* tell the pet where the mouse is when it's near, so it can look at it (polls only while the pet is awake) */
+let lastCursor = null;
+setInterval(() => {
+  if (!pet || pet.isDestroyed() || calmSent !== false || !pet.isVisible() || data.settings.motion === 'calm') return;
+  let c; try { c = screen.getCursorScreenPoint(); } catch (_) { return; }
+  const b = pet.getBounds(), x = c.x - b.x, y = c.y - b.y;
+  const near = x > -600 && x < b.width + 600 && y > -600 && y < b.height + 600;
+  const msg = near ? { x, y } : null;
+  const key = msg ? x + ',' + y : 'far';
+  if (key === lastCursor) return;
+  lastCursor = key; pet.webContents.send('cursor', msg);
+}, 120);
+
 function updateCalm() {
   let idle = 0; try { idle = powerMonitor.getSystemIdleTime(); } catch (_) {}
   const hidden = !pet || pet.isDestroyed() || !pet.isVisible();
@@ -286,22 +304,28 @@ function managerData() { return { reminders: data.reminders, settings: data.sett
 /* ---------------- windows ---------------- */
 function defaultPos() {
   const wa = screen.getPrimaryDisplay().workArea;
-  return { x: wa.x + wa.width - PET_W - 8, y: wa.y + wa.height - PET_H };
+  const d = petDims();
+  return { x: wa.x + wa.width - d.w - 8, y: wa.y + wa.height - d.h };
 }
 function validPos(p) {
   if (!p) return false;
+  const { w, h } = petDims();
   return screen.getAllDisplays().some(d => {
     const a = d.workArea;
-    return p.x + PET_W / 2 >= a.x && p.x + PET_W / 2 <= a.x + a.width && p.y + PET_H / 2 >= a.y && p.y + PET_H / 2 <= a.y + a.height;
+    return p.x + w / 2 >= a.x && p.x + w / 2 <= a.x + a.width && p.y + h / 2 >= a.y && p.y + h / 2 <= a.y + a.height;
   });
 }
 function createPet() {
-  // window grew taller (400 -> 470): keep the pet's feet where the user left them
-  if (data.settings.pos && (data.settings.petH || 400) !== PET_H) { data.settings.pos.y -= PET_H - (data.settings.petH || 400); }
-  data.settings.petH = PET_H;
+  // the window's size depends on settings: keep the pet's bottom-right corner where the user left it
+  const dims = petDims();
+  if (data.settings.pos) {
+    data.settings.pos.x -= dims.w - (data.settings.petW || 340);
+    data.settings.pos.y -= dims.h - (data.settings.petH || 400);
+  }
+  data.settings.petW = dims.w; data.settings.petH = dims.h;
   const p = validPos(data.settings.pos) ? data.settings.pos : defaultPos();
   pet = new BrowserWindow({
-    x: p.x, y: p.y, width: PET_W, height: PET_H,
+    x: p.x, y: p.y, width: dims.w, height: dims.h,
     transparent: true, frame: false, resizable: false, maximizable: false, minimizable: false,
     skipTaskbar: true, alwaysOnTop: true, hasShadow: false, focusable: true, show: false,
     backgroundColor: '#00000000',
@@ -322,6 +346,15 @@ function createPet() {
   setTimeout(() => reveal('timeout'), 4000);
   pet.webContents.on('render-process-gone', (_e, d) => log('pet renderer gone', d));
   pet.webContents.on('console-message', (_e, level, msg) => { if (level >= 2) log('pet console', msg); });
+}
+function resizePet() {
+  if (!pet || pet.isDestroyed()) return;
+  const b = pet.getBounds(), d = petDims();
+  if (b.width === d.w && b.height === d.h) return;
+  const x = b.x + b.width - d.w, y = b.y + b.height - d.h;   // keep the bottom-right corner in place
+  pet.setBounds({ x, y, width: d.w, height: d.h });
+  if (data.settings.pos) data.settings.pos = { x, y };
+  data.settings.petW = d.w; data.settings.petH = d.h;
 }
 function showPet() {
   if (!pet || pet.isDestroyed()) return;
@@ -456,7 +489,9 @@ ipcMain.handle('mgr:toggle', (_e, id, field) => {
 });
 ipcMain.handle('mgr:settings', (_e, s) => {
   const gpuChanged = 'gpu' in s && !!s.gpu !== !!data.settings.gpu;
+  const resize = ('size' in s && s.size !== data.settings.size) || ('textSize' in s && s.textSize !== data.settings.textSize);
   data.settings = Object.assign(data.settings, s);
+  if (resize) resizePet();
   applyLogin(); save(); pushState(false); pushManager(); rebuildTray();
   if (gpuChanged) {               // drawing mode is fixed at startup: restart to apply
     try { fs.writeFileSync(DATA_FILE(), JSON.stringify({ ...data, queue }, null, 2)); } catch (_) {}
@@ -479,8 +514,30 @@ ipcMain.handle('mgr:test', () => { fire(data.reminders.find(r => r.type !== 'tod
 app.on('second-instance', (_e, argv) => { if (!argv.includes('--relaunched')) openManager(); });
 app.on('will-quit', () => log('state updates sent', stateSends, 'skipped (no change)', stateSkips));
 app.on('window-all-closed', (e) => { /* keep running in tray */ });
+
+/* The old hand-made install (Georgi's first copy) steps aside once the real installer's copy exists:
+   it removes its own startup entry and the shortcuts that point at it, then starts the new app. */
+function retireLegacyIfReplaced() {
+  if (!LEGACY_INSTALL || process.platform !== 'win32') return false;
+  const newExe = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'desktop-pal', 'Desktop Pal.exe');
+  if (!fs.existsSync(newExe)) return false;
+  log('retiring old install; new app found at', newExe);
+  try { app.setLoginItemSettings({ openAtLogin: false, path: process.execPath }); } catch (e) { log('retire login', String(e)); }
+  const mine = (lnk) => { try { const s = shell.readShortcutLink(lnk); return s.target === process.execPath || /OtterPal[\\/]uninstall\.ps1/i.test(s.args || ''); } catch (_) { return false; } };
+  const programs = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
+  for (const lnk of [path.join(app.getPath('desktop'), 'Desktop Pal.lnk'), path.join(app.getPath('desktop'), 'Otter Pal.lnk'),
+                     path.join(programs, 'Desktop Pal.lnk'), path.join(programs, 'Otter Pal.lnk'),
+                     path.join(programs, 'Uninstall Desktop Pal.lnk'), path.join(programs, 'Uninstall Otter Pal.lnk')]) {
+    if (fs.existsSync(lnk) && mine(lnk)) { try { fs.unlinkSync(lnk); log('removed old shortcut', lnk); } catch (e) { log('rm', lnk, String(e)); } }
+  }
+  try { require('child_process').spawn(newExe, ['--relaunched'], { detached: true, stdio: 'ignore' }).unref(); log('started new app'); } catch (e) { log('start new app failed', String(e)); }
+  setTimeout(() => app.exit(0), 300);
+  return true;
+}
+
 app.whenReady().then(async () => {
   if (!(await waitForLock())) { app.quit(); return; }
+  if (retireLegacyIfReplaced()) return;
   try {
     powerMonitor.on('lock-screen', () => { locked = true; updateCalm(); });
     powerMonitor.on('unlock-screen', () => { locked = false; updateCalm(); });
