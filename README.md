@@ -26,6 +26,10 @@ Installed copies update themselves: when a new release is published here, your p
 - **Five pets:** sea otter, ginger cat, dog, red fox, red panda (original artwork)
 - **Reminders:** once, daily or weekly, every X minutes within set hours (overnight windows work), plus a to-do list
 - **Nine facial expressions:** picked automatically from the reminder's wording, or chosen by you
+- **Focus timer:** 25/5, 50/10, 90/15 or your own lengths; reminders wait as a badge until your break (or keep showing, your choice)
+- **Walks around:** your pet strolls along the bottom of the screen now and then and walks back home (Off / Sometimes / Often)
+- **Petting and treats:** stroke your pet with the mouse; finishing reminders and focus sessions earns treats to feed it
+- **Animal voices:** a soft purr, bark, squeak or yip, with volume control and quiet hours
 - **Stays out of the way:** clicks pass through around the pet, drag it anywhere, hide it for a while
 - **Light on your PC:** animations run at 10 fps and pause while you're away or the screen is locked
 - **Private:** everything stays on your computer, with no account and no data collected

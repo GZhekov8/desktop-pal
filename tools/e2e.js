@@ -35,7 +35,7 @@ async function petClick(pet) { // real mouse click on the pet (not a drag)
   fs.mkdirSync(path.join(cfg, 'Otter Pal'), { recursive: true });
   fs.writeFileSync(path.join(cfg, 'Otter Pal', 'otterpal-data.json'), JSON.stringify({
     reminders: [{ id: 'old1', type: 'todo', title: 'Old to-do survives rename', done: false, enabled: true }],
-    settings: { petName: 'Pedro', animal: 'otter', todoNudgeMin: 0 }, lastNudge: Date.now()
+    settings: { petName: 'Pedro', animal: 'otter', todoNudgeMin: 0, walk: 'off' }, lastNudge: Date.now()
   }));
 
   let { app, pet, errors } = await launch();
@@ -163,19 +163,32 @@ async function petClick(pet) { // real mouse click on the pet (not a drag)
   const b0 = await petBounds();
   ok('pet size slider has 5% steps from 50% to 150%', await mgr2.evaluate(() => { const e = document.getElementById('s-size'); return e.min === '50' && e.max === '150' && e.step === '5'; }));
   await slide('s-size', 65);
-  ok('pet size 65% applied to the pet', !!(await until(async () => (await pet.locator('#stage').getAttribute('style') || '').includes('--pet: 0.65'))));
-  ok('pet size saved as 0.65', !!(await until(() => readData().settings.size === 0.65)));
+  ok('pet size 65% previewed on the pet', !!(await until(async () => (await pet.locator('#stage').getAttribute('style') || '').includes('--pet: 0.65'))));
+  ok('preview is NOT saved yet', readData().settings.size !== 0.65);
+  ok('preview shows Apply / Cancel in Settings', await mgr2.locator('#previewRow').isVisible());
+  ok('pet shows a sample bubble with Apply / Cancel', !!(await until(async () => (await pet.locator('#bubble.show .b-title').innerText()).includes('how reminders will look'))));
+  await mgr2.click('#sizeApply');
+  ok('Apply saves pet size 0.65', !!(await until(() => readData().settings.size === 0.65)));
+  ok('sample bubble goes away after Apply', !!(await until(async () => !(await pet.locator('#bubble.show').count()))));
   ok('slider label shows 65%', (await mgr2.locator('#o-size').innerText()) === '65%');
   const b1 = await petBounds();
   ok('window shrinks but keeps its bottom-right corner', b1.x + b1.width === b0.x + b0.width && b1.y + b1.height === b0.y + b0.height && b1.height < b0.height, `${JSON.stringify(b0)} -> ${JSON.stringify(b1)}`);
   await slide('s-textSize', 130);
-  ok('text size 130% applied to the bubble only', !!(await until(async () => (await pet.locator('#stage').getAttribute('style') || '').includes('--text: 1.3'))));
+  ok('text size 130% previewed on the bubble only', !!(await until(async () => (await pet.locator('#stage').getAttribute('style') || '').includes('--text: 1.3'))));
+  await mgr2.click('#sizeApply');
+  await until(() => readData().settings.textSize === 1.3);
   await mgr2.click('#testBtn');
   await until(() => pet.locator('#bubble.show').count());
   const fit = await pet.evaluate(() => { const b = document.getElementById('bubble').getBoundingClientRect(), w = document.getElementById('otterWrap').getBoundingClientRect(); return b.left >= 0 && b.top >= 0 && b.right <= innerWidth && b.bottom <= w.top + 30; });
   ok('big text + small pet: bubble fully inside the window, above the pet', fit);
   await pet.locator('#bubble [data-a="done"]').click();
-  await slide('s-size', 100); await slide('s-textSize', 100);
+  // Cancel puts the previous size back
+  await slide('s-size', 140);
+  await until(async () => (await pet.locator('#stage').getAttribute('style') || '').includes('--pet: 1.4'));
+  await mgr2.click('#sizeCancel');
+  ok('Cancel restores the previous size', !!(await until(async () => (await pet.locator('#stage').getAttribute('style') || '').includes('--pet: 0.65'))) && readData().settings.size === 0.65);
+  await slide('s-size', 100); await mgr2.click('#sizeApply'); await until(() => readData().settings.size === 1);
+  await slide('s-textSize', 100); await mgr2.click('#sizeApply'); await until(() => readData().settings.textSize === 1);
   const b2 = await until(async () => { const b = await petBounds(); return b.width === b0.width && b.height === b0.height && b; });
   ok('back to 100%: window returns to its original size and spot', !!b2 && b2.x === b0.x && b2.y === b0.y);
   await mgr2.click('#testBtn');

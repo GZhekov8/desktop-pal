@@ -89,6 +89,7 @@
 <div class="tabs">
   <button class="tab on" data-tab="rem">Reminders</button>
   <button class="tab" data-tab="todo">To-do list</button>
+  <button class="tab" data-tab="focus">Focus</button>
   <button class="tab" data-tab="set">Settings</button>
 </div>
 
@@ -104,6 +105,22 @@
     <div class="help" id="todoHelp" style="margin-top:10px"></div>
   </section>
 
+  <section id="tab-focus" class="hidden">
+    <div class="set">
+      <div class="r"><div>Session<small id="focusStatus">Not focusing</small></div><button class="btn primary" id="focusBtn">Start focus</button></div>
+      <div class="r"><div>Length<small>Focus / break in minutes. A longer break comes after every 4 rounds.</small></div>
+        <div class="seg" id="f-preset" style="width:auto;grid-template-columns:repeat(4,auto)">
+          <button data-v="25/5">25 / 5</button><button data-v="50/10">50 / 10</button><button data-v="90/15">90 / 15</button><button data-v="custom">Custom</button>
+        </div></div>
+      <div class="r" id="customRow"><div>Custom lengths (minutes)<small>Focus · short break · long break</small></div>
+        <div style="display:flex;gap:6px"><input type="number" id="s-focusMin" min="1" max="240" style="width:64px"><input type="number" id="s-breakMin" min="1" max="120" style="width:64px"><input type="number" id="s-longBreakMin" min="1" max="120" style="width:64px"></div></div>
+      <div class="r"><div>Reminders during focus<small>Hold them as a small "waiting" count until your break, or keep showing them as usual.</small></div>
+        <select id="s-focusReminders"><option value="badge">Hold until the break</option><option value="show">Show as usual</option></select></div>
+      <div class="r"><div>Today<small id="focusStats">0 sessions</small></div><div class="sub" id="treatsLine" style="color:var(--muted)"></div></div>
+    </div>
+    <p class="help">Start a session here, from your pet's bubble, or from the tray icon. Your pet works quietly with a countdown, wakes you for breaks, and earns a treat for every finished session.</p>
+  </section>
+
   <section id="tab-set" class="hidden">
     <div class="set">
       <div class="r"><div>Animal<small>Who keeps you company in the corner</small></div><select id="s-animal">
@@ -111,10 +128,18 @@
       </select></div>
       <div class="r"><div>Pet's name<small>Shown in its speech bubble</small></div><input type="text" id="s-petName" maxlength="20"></div>
       <div class="r"><div>Pet size<small>How big your pet is on screen</small></div><div class="rng"><input type="range" id="s-size" min="50" max="150" step="5"><output id="o-size">100%</output></div></div>
+      <div class="r hidden" id="previewRow" style="background:#fdf1e7;margin:0 -16px;padding:10px 16px"><div>Previewing on your pet<small>Look at your pet to see the new size, then keep it or go back.</small></div>
+        <div style="display:flex;gap:6px"><button class="btn primary" id="sizeApply">Apply</button><button class="btn" id="sizeCancel">Cancel</button></div></div>
       <div class="r"><div>Text size<small>Size of the speech bubble, so reminders stay readable even with a small pet</small></div><div class="rng"><input type="range" id="s-textSize" min="80" max="150" step="5"><output id="o-textSize">100%</output></div></div>
       <div class="r"><div>Motion<small>Lively: gently bobs and breathes. Calm: stays still apart from blinking (uses the least power).</small></div><select id="s-motion"><option value="lively">Lively</option><option value="calm">Calm</option></select></div>
       <div class="r"><div>Use graphics card<small>Smoother and lighter on the processor. If your pet disappears, turn this off again (from the tray icon → Open Desktop Pal). The app restarts to apply it.</small></div><label class="switch"><input type="checkbox" id="s-gpu"><span></span></label></div>
-      <div class="r"><div>Play a chime<small>Soft three-note sound when something is due</small></div><label class="switch"><input type="checkbox" id="s-sound"><span></span></label></div>
+      <div class="r"><div>Walks around<small>Your pet strolls along the bottom of the screen now and then, and comes back home.</small></div>
+        <div style="display:flex;gap:6px;align-items:center"><select id="s-walk" style="width:120px"><option value="off">Off</option><option value="sometimes">Sometimes</option><option value="often">Often</option></select><button class="btn small" id="walkNow">Walk now</button></div></div>
+      <div class="r"><div>Sounds<small>Reminder chime and your pet's voice</small></div><label class="switch"><input type="checkbox" id="s-sound"><span></span></label></div>
+      <div class="r"><div>Volume</div><div class="rng"><input type="range" id="s-volume" min="0" max="100" step="5"><output id="o-volume">70%</output></div></div>
+      <div class="r"><div>Animal voice<small>A short purr, bark, squeak or yip when you pet it, feed it or it calls you</small></div><label class="switch"><input type="checkbox" id="s-voices"><span></span></label></div>
+      <div class="r"><div>Quiet hours<small>No sounds during these hours; bubbles still show</small></div>
+        <div style="display:flex;gap:6px;align-items:center"><label class="switch"><input type="checkbox" id="s-quietOn"><span></span></label><input type="time" id="s-quietFrom" style="width:110px"><span style="color:var(--muted)">–</span><input type="time" id="s-quietTo" style="width:110px"></div></div>
       <div class="r"><div>Windows notifications too<small>Handy if your pet is hidden behind a full-screen app</small></div><label class="switch"><input type="checkbox" id="s-notifications"><span></span></label></div>
       <div class="r"><div>Start with Windows</div><label class="switch"><input type="checkbox" id="s-startWithWindows"><span></span></label></div>
       <div class="r"><div>Default snooze (minutes)</div><input type="number" id="s-snoozeDefault" min="1" max="240"></div>
@@ -204,7 +229,7 @@ function describe(r) {
 /* ---------- tabs ---------- */
 function showTab(t) {
   $$('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  ['rem','todo','set'].forEach(k => $('#tab-' + k).classList.toggle('hidden', k !== t));
+  ['rem','todo','focus','set'].forEach(k => $('#tab-' + k).classList.toggle('hidden', k !== t));
   if (t === 'todo') setTimeout(() => $('#todoInput').focus(), 50);
 }
 $$('.tab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
@@ -254,20 +279,43 @@ function render() {
   $('#s-motion').value = s.motion || 'lively';
   $('#s-gpu').checked = !!s.gpu;
   for (const k of ['sound','notifications','startWithWindows']) $('#s-' + k).checked = !!s[k];
+  $('#s-voices').checked = s.voices !== false; $('#s-quietOn').checked = !!s.quietOn;
+  for (const k of ['quietFrom','quietTo','walk','focusReminders','focusMin','breakMin','longBreakMin']) { const el = $('#s-' + k); if (document.activeElement !== el && s[k] != null) el.value = s[k]; }
+  if (document.activeElement !== $('#s-volume')) { $('#s-volume').value = s.volume == null ? 70 : s.volume; $('#o-volume').textContent = $('#s-volume').value + '%'; }
+  $$('#f-preset button').forEach(b => b.classList.toggle('on', b.dataset.v === (s.focusPreset || '25/5')));
+  $('#customRow').classList.toggle('hidden', (s.focusPreset || '25/5') !== 'custom');
+  const f = D.focus || { state: 'idle' }, L = f.lens || { focus: 25 };
+  const left = f.endsAt ? Math.max(0, Math.round((f.endsAt - Date.now()) / 60000)) : 0;
+  $('#focusStatus').textContent = f.state === 'focus' ? `Focusing, round ${f.round} · about ${left} min left${f.held ? ` · ${f.held} reminder(s) waiting` : ''}`
+    : f.state === 'break' ? `On a break · about ${left} min left` : f.state === 'ready' ? 'Break is over, ready for the next round' : `Not focusing · next session ${L.focus} min`;
+  $('#focusBtn').textContent = f.state === 'idle' ? 'Start focus' : f.state === 'ready' ? 'Start next round' : 'Stop';
+  const st = D.stats || {}; $('#focusStats').textContent = `${st.sessions || 0} session${st.sessions === 1 ? '' : 's'} · ${st.minutes || 0} min focused`;
+  $('#treatsLine').textContent = `${D.treats || 0} treat${D.treats === 1 ? '' : 's'} saved up`;
+  $('#previewRow').classList.toggle('hidden', !D.previewing);
 }
 for (const k of ['petName','snoozeDefault','todoNudgeMin','animal','motion']) $('#s-' + k).onchange = (e) => {
   const v = k === 'petName' ? (e.target.value.trim() || 'Ollie') : (k === 'animal' || k === 'motion') ? e.target.value : Number(e.target.value);
   window.otter.settings({ [k]: v });
 };
-for (const k of ['sound','notifications','startWithWindows','gpu']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: e.target.checked });
+for (const k of ['sound','notifications','startWithWindows','gpu','voices','quietOn']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: e.target.checked });
+for (const k of ['quietFrom','quietTo','walk','focusReminders']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: e.target.value });
+for (const k of ['focusMin','breakMin','longBreakMin']) $('#s-' + k).onchange = (e) => window.otter.settings({ [k]: Math.max(1, Number(e.target.value) || 1) });
+$('#s-volume').oninput = (e) => { $('#o-volume').textContent = e.target.value + '%'; };
+$('#s-volume').onchange = (e) => window.otter.settings({ volume: Number(e.target.value) });
+$$('#f-preset button').forEach(b => b.onclick = () => window.otter.settings({ focusPreset: b.dataset.v }));
+$('#focusBtn').onclick = async () => { const f = (D.focus || {}).state; D = await window.otter.focusMgr(f === 'idle' || f === 'ready'); render(); };
+$('#walkNow').onclick = () => window.otter.walkNow();
+setInterval(() => { if (!$('#tab-focus').classList.contains('hidden')) render(); }, 15000);
 $('#testBtn').onclick = () => window.otter.test();
 // size sliders: live preview while dragging (throttled), 5% steps
 for (const k of ['size', 'textSize']) {
   const el = $('#s-' + k); let t = null;
-  const send = () => window.otter.settings({ [k]: Number(el.value) / 100 });
+  const send = () => window.otter.previewSize({ [k]: Number(el.value) / 100 });   // shown on the pet, saved only on Apply
   el.oninput = () => { $('#o-' + k).textContent = el.value + '%'; clearTimeout(t); t = setTimeout(send, 60); };
   el.onchange = () => { clearTimeout(t); send(); };
 }
+$('#sizeApply').onclick = () => window.otter.applySize();
+$('#sizeCancel').onclick = async () => { await window.otter.cancelSize(); D = await window.otter.get(); for (const k of ['size','textSize']) { const v = Math.round((Number(D.settings[k]) || 1) * 100); $('#s-' + k).value = v; $('#o-' + k).textContent = v + '%'; } render(); };
 const UPD = { idle: 'Up to date', latest: 'Up to date', checking: 'Checking for updates…', error: "Couldn't check for updates right now", ready: 'An update is ready' };
 let ABOUT = { version: '', page: '', canUpdate: false };
 function paintAbout(u) {

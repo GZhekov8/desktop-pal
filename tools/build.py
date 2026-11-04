@@ -2,7 +2,7 @@ import os as _os
 ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
 import sys
 sys.path.insert(0, ROOT + '/tools')
-from animals import ANIMALS, DEFS, neck
+from animals import ANIMALS, DEFS, neck, walker, WALKERS
 s = open(ROOT + '/tools/pet.otter-base.html').read()
 
 def cut(s, a, b):
@@ -19,7 +19,7 @@ s = s.replace('          <!-- whiskers: long, pale, drooping -->', face + '     
 art = {'otter': {}}
 a = s.index('        <!-- reflection / shadow on the water -->'); b = s.index('        <!-- EXPRESSION EXTRAS -->')
 art['otter']['float'] = '<g class="animal a-otter">' + s[a:b] + '</g>'
-s = s[:a] + '<g id="slot-float"></g>\n' + s[b:]
+s = s[:a] + '<g id="slot-float"></g><g id="slot-walk"></g>\n' + s[b:]
 a = s.index('        <!-- water droplets glinting on the fur -->'); b = s.index('        <!-- exclamation -->')
 art['otter']['float2'] = '<g class="animal a-otter">' + s[a:b] + '</g>'
 s = s[:a] + '<g id="slot-float2"></g>\n' + s[b:]
@@ -55,8 +55,16 @@ def wrap_head(f):
         if depth == 0: j = i + m.end(); break
     return f[:i] + '<g class="head">' + f[i:j] + '</g>' + f[j:]
 
+def head_of(f):
+    i = f.index('<g class="head">'); depth = 0
+    for m in re.finditer(r'<g[\s>]|</g>', f[i:]):
+        depth += -1 if m.group(0) == '</g>' else 1
+        if depth == 0: return f[i:i + m.end()]
+
 for name, parts in art.items():
     parts['float'] = wrap_head(parts['float'])
+    dx, dy = WALKERS[name]['head']
+    parts['walk'] = walker(name).replace('@@HEAD@@', f'<g transform="translate({dx} {dy})">' + head_of(parts['float']) + '</g>')
     json.dump({k: squeeze(v) for k, v in parts.items()}, open(f'{ROOT}/src/pets/{name}.json', 'w'), separators=(',', ':'))
 
 # 5. css
@@ -76,9 +84,9 @@ css = '''
 s = s.replace('\n</style>', css, 1)
 s = s.replace('<div class="stage m-neutral" id="stage">', '<div class="stage m-neutral pet-otter" id="stage">')
 # 6. js: load the chosen animal's art on demand
-s = s.replace("  stage.classList.toggle('alert', state.queue.length > 0);",
-"""  loadArt((state.settings && state.settings.animal) || 'otter');
-  stage.classList.toggle('alert', state.queue.length > 0);""", 1)
+anchor = "  stage.classList.toggle('alert', state.queue.some(q => q.kind !== 'preview'));"
+assert anchor in s, 'loadArt anchor missing'
+s = s.replace(anchor, "  loadArt((state.settings && state.settings.animal) || 'otter');\n" + anchor, 1)
 s = s.replace("/* ---- facial expressions ---- */", """/* ---- animal art: only the chosen pet is loaded ---- */
 let artFor = null;
 async function loadArt(animal) {
@@ -88,7 +96,7 @@ async function loadArt(animal) {
   try { a = await window.otter.art(animal); } catch (e) { a = null; }
   if (!a) { if (animal !== 'otter') { artFor = null; return loadArt('otter'); } return; }
   if (artFor !== animal) return;            // user switched again meanwhile
-  for (const k of ['back', 'float', 'float2', 'front']) document.getElementById('slot-' + k).innerHTML = a[k] || '';
+  for (const k of ['back', 'float', 'float2', 'front', 'walk']) document.getElementById('slot-' + k).innerHTML = a[k] || '';
   if (typeof collectParts === 'function') collectParts();
   stage.className = (stage.className.replace(/\\bpet-\\w+/g, '') + ' pet-' + animal).replace(/\\s+/g, ' ').trim();
 }

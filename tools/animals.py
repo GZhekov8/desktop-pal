@@ -376,3 +376,66 @@ def neck(name):
     fill_strands(st, d, 520, col, lambda x, y: math.atan2(y - 92, x - 186) * .4 + math.pi / 2 * .6, (2, 4))
     edge_strands(st, d, col, skip=lambda x, y: y > 126 or x < 172)
     return f'<path d="{d}" fill="{fill}" filter="url(#fur)"/>{st.svg()}'
+
+# ================================================================ WALKING POSES
+# Side-view standing/walking bodies with a simple leg rig. The head (with all its faces) is
+# copied from the lying pose at build time, so expressions work while walking too.
+# Each leg is <g class="leg" transform="translate(hipX hipY)"><g class="swing" data-phase=".."> so the
+# app can swing it around the hip with setAttribute('transform', 'rotate(a)').
+WALKERS = {
+    'cat': dict(body='M58 96 C60 80 82 74 110 74 C140 74 166 76 180 86 C190 94 189 110 178 117 C150 123 92 123 68 117 C56 113 55 104 58 96 Z',
+                fill='url(#catBodyG)', leg='#d0803c', farleg='#b3692c', paw='#f3d7b4', legLen=40, hipY=108,
+                hips=(76, 90, 160, 172), tail='M62 90 C44 84 32 70 34 52 C35 45 42 44 43 51 C42 66 50 78 66 84 Z', tailFill='#cf8240',
+                neck='M156 98 C158 82 170 66 186 62 C199 59 206 72 201 86 C195 100 176 108 160 106 Z',
+                col=lambda x, y: ('#a3501b' if math.sin((x - y * .2) / 6.5) > .55 else hexmix('#eaa862', '#b8692c', q((y - 74) / 48))),
+                tcol=lambda x, y: '#a65a22' if math.sin(y / 4.5) > .4 else '#dd9450', head=(0, -22)),
+    'dog': dict(body='M56 98 C58 80 80 74 110 74 C140 74 166 76 180 86 C191 95 190 112 178 118 C150 124 92 124 66 118 C55 114 54 106 56 98 Z',
+                fill='url(#dogBodyG)', leg='#c48a48', farleg='#a8743a', paw='#f1e5d0', legLen=40, hipY=110,
+                hips=(74, 88, 160, 173), tail='M60 90 C46 80 40 64 46 52 C48 47 53 48 52 54 C50 66 56 78 66 84 Z', tailFill='#b37638',
+                neck='M156 98 C158 82 170 66 187 62 C200 59 207 72 202 86 C196 100 177 108 160 106 Z',
+                col=lambda x, y: ('#f2e6d2' if x > 160 and y > 98 else hexmix('#d8a05c', '#8a5a2c', q((y - 74) / 48))),
+                tcol=lambda x, y: '#b37638', head=(-2, -24)),
+    'fox': dict(body='M58 96 C60 80 82 74 110 74 C140 74 166 76 180 86 C190 94 189 110 178 117 C150 123 92 123 68 117 C56 113 55 104 58 96 Z',
+                fill='url(#foxBodyG)', leg='#2a1a14', farleg='#1d120d', paw='#1d120d', legLen=40, hipY=108,
+                hips=(76, 90, 160, 172), tail='M62 100 C42 100 20 110 10 126 C8 134 16 136 24 131 C36 122 50 114 64 108 Z', tailFill='#d06c2a',
+                neck='M156 98 C158 82 170 66 186 62 C199 59 206 72 201 86 C195 100 176 108 160 106 Z',
+                col=lambda x, y: ('#f6efe4' if x > 164 and y > 92 else hexmix('#ec8a42', '#a84f1a', q((y - 74) / 48))),
+                tcol=lambda x, y: '#f8f2ea' if x < 22 else hexmix('#e07c36', '#a34c18', q((y - 100) / 30)), head=(0, -22)),
+    'redpanda': dict(body='M58 96 C60 80 82 74 110 74 C140 74 166 76 180 86 C190 94 189 110 178 117 C150 123 92 123 68 117 C56 113 55 104 58 96 Z',
+                fill='url(#rpBodyG)', leg='#2a1410', farleg='#1c0d0a', paw='#1c0d0a', legLen=38, hipY=110,
+                hips=(76, 90, 160, 172), tail='M62 94 C42 94 22 100 10 114 C6 120 10 126 16 122 C28 112 46 106 64 104 Z', tailFill='#b04a28',
+                neck='M156 98 C158 82 170 66 186 62 C199 59 206 72 201 86 C195 100 176 108 160 106 Z',
+                col=lambda x, y: ('#3a1810' if y > 108 else hexmix('#d0643a', '#7a2a18', q((y - 74) / 40))),
+                tcol=lambda x, y: '#e7a06a' if int(x / 7) % 2 else '#a63d22', head=(0, -22)),
+    'otter': dict(body='M40 112 C44 98 70 92 110 92 C150 92 176 96 186 106 C192 116 186 126 170 128 C130 132 80 132 52 126 C42 122 38 118 40 112 Z',
+                fill='url(#bodyG)', leg='#3b2318', farleg='#2a1810', paw='#2b1810', legLen=22, hipY=124,
+                hips=(66, 80, 156, 168), tail='M44 114 C30 114 14 118 4 125 C12 130 30 130 46 123 Z', tailFill='#4a2c1c',
+                neck='M162 104 C168 96 180 92 192 94 C200 98 202 108 196 116 C188 122 172 122 162 116 Z',
+                col=lambda x, y: hexmix('#7a4e33', '#2e1a10', q((y - 92) / 40)) if x < 172 else '#b79772',
+                tcol=lambda x, y: '#4a2c1c', head=(2, 12), shine='M60 99 C90 94 130 94 170 100'),
+}
+
+def walker(name):
+    random.seed(77)
+    w = WALKERS[name]
+    st = Strands(); fill_strands(st, w['body'], 1300, w['col'], lambda x, y: math.pi + .1, (2, 4))
+    edge_strands(st, w['body'], w['col'], skip=lambda x, y: y > w['hipY'] + 4)
+    tst = Strands(); fill_strands(tst, w['tail'], 260, w['tcol'], lambda x, y: math.pi + .4, (2, 4.5), curl=1)
+    edge_strands(tst, w['tail'], w['tcol'], step=2, len_rng=(1.5, 3.5))
+    nst = Strands(); fill_strands(nst, w['neck'], 260, w['col'], lambda x, y: -math.pi / 2 + .4, (2, 3.5))
+    L = w['legLen']
+    def leg(x, color, phase, far):
+        return (f'<g class="leg" transform="translate({x} {w["hipY"]})"><g class="swing" data-phase="{phase}">'
+                f'<path d="M-9 -6 C-9.5 {L*.3:.0f} -6 {L*.7:.0f} -4 {L} L4 {L} C6 {L*.7:.0f} 9 {L*.3:.0f} 8.5 -6 Z" fill="{color}" filter="url(#fur)"/>'
+                f'<ellipse cx="1.5" cy="{L+1}" rx="6" ry="3.2" fill="{w["paw"] if not far else color}"/></g></g>')
+    b1, b2, f1, f2 = w['hips']
+    ground = w['hipY'] + L + 2
+    return (f'<g class="walker">'
+            f'<ellipse cx="118" cy="{ground}" rx="72" ry="4.5" fill="#000" opacity=".22" filter="url(#soft)"/>'
+            f'<g class="wtail"><path d="{w["tail"]}" fill="{w["tailFill"]}" filter="url(#fur)"/>{tst.svg()}</g>'
+            + leg(b2, w['farleg'], 3.14, True) + leg(f2, w['farleg'], 0, True) +
+            f'<g class="wbody"><path d="{w["body"]}" fill="{w["fill"]}" filter="url(#fur)"/>{st.svg()}'
+            f'<path d="{w.get("shine", "M70 86 C90 76 130 72 168 80")}" stroke="#ffe6c8" stroke-opacity=".25" stroke-width="2" fill="none" filter="url(#soft1)"/></g>'
+            + leg(b1, w['leg'], 0, False) + leg(f1, w['leg'], 3.14, False) +
+            f'<path d="{w["neck"]}" fill="{w["fill"]}" filter="url(#fur)"/>{nst.svg()}'
+            f'@@HEAD@@</g>')

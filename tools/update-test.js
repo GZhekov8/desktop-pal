@@ -13,7 +13,7 @@ async function run(feed) {
 (async () => {
   // a) a newer version is published
   let { app, pet, cfg } = await run('http://127.0.0.1:8765');
-  const bubble = await until(async () => (await pet.locator('#bubble.show .b-title').innerText()).includes('1.4.0'), 90000);
+  const bubble = await until(async () => (await pet.locator('#bubble.show .b-title').innerText()).includes('99.0.0'), 90000);
   ok('finds and downloads the new version, pet announces it', !!bubble);
   ok('download was verified (checksum) before announcing', fs.readFileSync(cfg + '/Desktop Pal/otterpal.log', 'utf8').includes('update-downloaded') || !!bubble);
   ok('pet looks excited about it', await pet.locator('#stage.m-excited').count() === 1);
@@ -24,7 +24,7 @@ async function run(feed) {
   await pet.evaluate(() => window.otter.open('set'));
   const mgr = await until(() => app.windows().find(w => w.url().includes('manager.html')), 8000);
   await mgr.waitForLoadState(); await sleep(800);
-  ok('Settings shows "Version 1.4.0 is ready"', (await mgr.locator('#aboutLine').innerText()).includes('1.4.0 is ready'), await mgr.locator('#aboutLine').innerText());
+  ok('Settings shows "Version 99.0.0 is ready"', (await mgr.locator('#aboutLine').innerText()).includes('99.0.0 is ready'), await mgr.locator('#aboutLine').innerText());
   ok('Settings button says "Restart to update"', (await mgr.locator('#updBtn').innerText()) === 'Restart to update');
   await app.close();
   // b) already up to date (feed says same version)
@@ -34,7 +34,10 @@ async function run(feed) {
   ok('no feed published yet: stays quiet (no bubble, no error)', !(await pet.locator('#stage.alert').count()));
   await pet.evaluate(() => window.otter.open('set'));
   const m2 = await until(() => app.windows().find(w => w.url().includes('manager.html')), 8000); await m2.waitForLoadState(); await sleep(800);
-  ok('no feed: Settings hides the update button', !(await m2.locator('#updBtn').isVisible()), await m2.locator('#aboutLine').innerText());
+  const hasPage = !!require(ROOT + '/package.json').homepage;
+  ok(hasPage ? 'no feed: update button falls back to opening the releases page' : 'no feed: Settings hides the update button',
+     hasPage ? (await m2.locator('#updBtn').isVisible()) && (await m2.locator('#updBtn').innerText()) === 'Check for updates' : !(await m2.locator('#updBtn').isVisible()),
+     await m2.locator('#aboutLine').innerText());
   await app.close();
   console.log(`\n${pass}/${pass + fail} passed`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('CRASH', e); process.exit(2); });

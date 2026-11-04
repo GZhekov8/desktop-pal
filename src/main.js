@@ -50,7 +50,9 @@ function restartSelf() {
 const DATA_FILE = () => path.join(app.getPath('userData'), 'otterpal-data.json');
 // The pet window fits the pet (50-150%) plus a speech bubble whose text size is set separately (80-150%).
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-function petDims(s = data.settings) {
+let preview = null;        // size/text size being previewed from Settings, not saved yet
+function eff() { return preview ? { ...data.settings, ...preview } : data.settings; }
+function petDims(s = eff()) {
   const pet = clamp(Number(s.size) || 1, 0.5, 1.5), text = clamp(Number(s.textSize) || 1, 0.8, 1.5);
   return { w: Math.ceil(Math.max(302 * text + 28, 246 * pet + 10)), h: Math.ceil(170 * pet + 12 + 300 * text) };
 }
@@ -68,9 +70,20 @@ let data = {
     motion: 'lively',      // 'lively' | 'calm'
     gpu: false,            // use the graphics card for drawing
     animal: 'otter',
-    pos: null              // {x,y} remembered after dragging
+    textSize: 1,
+    walk: 'sometimes',     // 'off' | 'sometimes' | 'often'
+    focusPreset: '25/5',   // '25/5' | '50/10' | '90/15' | 'custom'
+    focusMin: 25, breakMin: 5, longBreakMin: 15,
+    focusReminders: 'badge', // 'badge' (hold until the break) | 'show'
+    volume: 70, voices: true,
+    quietOn: false, quietFrom: '22:00', quietTo: '08:00',
+    pos: null              // {x,y} the pet's home spot, remembered after dragging
   },
-  lastNudge: 0
+  lastNudge: 0,
+  treats: 0,
+  focus: { state: 'idle', endsAt: 0, round: 0, prompt: null, released: 0 },
+  stats: { day: '', sessions: 0, minutes: 0 },
+  held: []                 // reminders that came due during focus (badge mode)
 };
 let queue = [];            // ids (or 'todo-nudge') currently waiting for the user
 let pet, manager, tray;
@@ -83,6 +96,10 @@ function load() {
     data.reminders = raw.reminders || [];
     data.settings = Object.assign(data.settings, raw.settings || {});
     data.lastNudge = raw.lastNudge || 0;
+    data.treats = raw.treats || 0;
+    data.focus = Object.assign(data.focus, raw.focus || {});
+    data.stats = Object.assign(data.stats, raw.stats || {});
+    data.held = (raw.held || []).filter(id => data.reminders.some(r => r.id === id));
     queue = (raw.queue || []).filter(q => q === 'todo-nudge' || data.reminders.some(r => r.id === q));
   } catch (_) {
     // first run: a couple of friendly examples
@@ -162,7 +179,11 @@ function computeNext(r, fromMs) {
 }
 
 function fire(id) {
-  if (queue.includes(id)) return;
+  if (queue.includes(id) || data.held.includes(id)) return;
+  if (data.focus.state === 'focus' && data.settings.focusReminders !== 'show' && id !== 'update') {
+    data.held.push(id); log('held during focus', id); pushState(false); pushManager(); save(); return;   // shows as a badge until the break
+  }
+  stopWalk();
   queue.push(id);
   const r = data.reminders.find(x => x.id === id);
   if (data.settings.notifications && Notification.isSupported()) {
@@ -218,11 +239,16 @@ function updateCalm() {
   let idle = 0; try { idle = powerMonitor.getSystemIdleTime(); } catch (_) {}
   const hidden = !pet || pet.isDestroyed() || !pet.isVisible();
   const calm = locked || hidden || (idle >= CALM_AFTER && !queue.length);
-  if (calm !== calmSent && pet && !pet.isDestroyed()) { calmSent = calm; pet.webContents.send('calm', calm); log('calm', calm, { idle, locked, hidden }); }
+  if (calm !== calmSent && pet && !pet.isDestroyed()) {
+    calmSent = calm; pet.webContents.send('calm', calm); log('calm', calm, { idle, locked, hidden });
+    if (calm) stopWalk(); else scheduleWalk();
+  }
 }
 
 function complete(id) {
   if (id === 'update') { log('installing update', upd.version); if (updater) setImmediate(() => updater.quitAndInstall(true, true)); return; }
+  if (id === 'preview') return applyPreview();
+  if (id === 'focus-break' || id === 'focus-next') return startFocus();   // "Skip break" / "Start"
   queue = queue.filter(q => q !== id);
   if (id === 'todo-nudge') { data.lastNudge = Date.now(); }
   else {
@@ -230,19 +256,155 @@ function complete(id) {
     if (r) {
       if (r.type === 'once') { r.done = true; r.nextAt = null; }
       else r.nextAt = computeNext(r, Date.now());
+      earnTreat('reminder');
     }
   }
-  save(); pushState(false); pushManager();
+  save(); pushState(false); pushManager(); afterQueue();
 }
 function snooze(id, mins) {
   if (id === 'update') { updDismissed = true; pushState(false); return; }
+  if (id === 'preview') return cancelPreview();
+  if (id === 'focus-break' || id === 'focus-next') return stopFocus();    // "Stop focusing" / "Not now"
   queue = queue.filter(q => q !== id);
   if (id === 'todo-nudge') data.lastNudge = Date.now() - (data.settings.todoNudgeMin - mins) * 60000;
   else {
     const r = data.reminders.find(x => x.id === id);
     if (r) r.nextAt = Date.now() + mins * 60000;
   }
-  save(); pushState(false); pushManager();
+  save(); pushState(false); pushManager(); afterQueue();
+}
+function afterQueue() { if (!queue.length && walkPose !== 'rest') setTimeout(() => { if (!queue.length) walkHome(); }, 1500); }
+
+/* ---------------- treats: earned by finishing reminders and focus sessions ---------------- */
+function earnTreat(why) { data.treats = Math.min(99, (data.treats || 0) + 1); data.lastTreat = { at: Date.now(), why }; }
+
+/* ---------------- focus timer ---------------- */
+const MIN = Number(process.env.DP_FOCUS_MINUTE_MS) || 60000;   // tests shrink minutes
+const PRESETS = { '25/5': [25, 5, 15], '50/10': [50, 10, 20], '90/15': [90, 15, 30] };
+function focusLens() {
+  const s = data.settings, p = PRESETS[s.focusPreset];
+  return p ? { focus: p[0], short: p[1], long: p[2] } :
+    { focus: clamp(Number(s.focusMin) || 25, 1, 240), short: clamp(Number(s.breakMin) || 5, 1, 120), long: clamp(Number(s.longBreakMin) || 15, 1, 120) };
+}
+let focusTimer = null;
+function today() { return new Date().toDateString(); }
+function scheduleFocus() {
+  clearTimeout(focusTimer);
+  const f = data.focus;
+  if ((f.state === 'focus' || f.state === 'break') && f.endsAt) focusTimer = setTimeout(focusDue, Math.max(0, f.endsAt - Date.now()));
+}
+function releaseHeld() {
+  const n = data.held.length;
+  for (const id of data.held) if (!queue.includes(id)) queue.push(id);
+  data.held = [];
+  return n;
+}
+function startFocus() {
+  const L = focusLens();
+  queue = queue.filter(q => q !== 'focus-break' && q !== 'focus-next');
+  data.focus = { state: 'focus', endsAt: Date.now() + L.focus * MIN, round: (data.focus.round || 0) + 1, prompt: null, released: 0, len: L.focus };
+  stopWalk(); walkHome();
+  log('focus start', data.focus);
+  scheduleFocus(); save(); pushState(false); pushManager(); rebuildTray();
+}
+function stopFocus() {
+  queue = queue.filter(q => q !== 'focus-break' && q !== 'focus-next');
+  const n = releaseHeld();
+  data.focus = { state: 'idle', endsAt: 0, round: 0, prompt: null, released: n };
+  clearTimeout(focusTimer);
+  log('focus stop, released', n);
+  save(); pushState(n > 0); pushManager(); rebuildTray(); afterQueue();
+}
+function focusDue() {
+  const f = data.focus, L = focusLens();
+  if (f.state === 'focus') {
+    if (data.stats.day !== today()) data.stats = { day: today(), sessions: 0, minutes: 0 };
+    data.stats.sessions++; data.stats.minutes += f.len || L.focus;
+    earnTreat('focus');
+    const long = f.round % 4 === 0, mins = long ? L.long : L.short;
+    const n = releaseHeld();
+    data.focus = { ...f, state: 'break', endsAt: Date.now() + mins * MIN, prompt: 'break', released: n, breakLen: mins, long };
+    queue.unshift('focus-break');
+    notify(`${data.settings.petName}: break time!`, `${mins} minute ${long ? 'long ' : ''}break.` + (n ? ` ${n} reminder${n > 1 ? 's' : ''} waited for you.` : ''));
+  } else if (f.state === 'break') {
+    queue = queue.filter(q => q !== 'focus-break');
+    data.focus = { ...f, state: 'ready', endsAt: 0, prompt: 'next' };
+    queue.unshift('focus-next');
+    notify(`${data.settings.petName}: break's over`, `Ready for round ${f.round + 1}?`);
+  }
+  log('focus', data.focus.state);
+  scheduleFocus(); showPet(); save(); pushState(true); pushManager(); rebuildTray();
+}
+function notify(title, body) {
+  if (!data.settings.notifications || !Notification.isSupported()) return;
+  try { const n = new Notification({ title, body, silent: true }); n.on('click', () => showPet()); n.show(); } catch (_) {}
+}
+
+/* ---------------- size preview (Settings sliders) ---------------- */
+function previewSize(p) { preview = { ...(preview || {}), ...p }; resizePet(); pushState(false); pushManager(); }
+function applyPreview() {
+  if (!preview) return;
+  Object.assign(data.settings, preview); preview = null;
+  resizePet(); save(); pushState(false); pushManager();
+}
+function cancelPreview() { if (!preview) return; preview = null; resizePet(); pushState(false); pushManager(); }
+
+/* ---------------- walking along the bottom of the screen ---------------- */
+const WALK_SPEED = 55;                                          // px per second
+const WALK_SCALE = Number(process.env.DP_WALK_SCALE) || 1;     // tests shorten the waits
+let walkPose = 'rest', walkDir = 1, walkMover = null, walkTimer = null;
+function homePos() { return data.settings.pos || defaultPos(); }
+function setPose(p, dir) {
+  walkPose = p; if (dir) walkDir = dir;
+  if (pet && !pet.isDestroyed()) pet.webContents.send('pose', { pose: p, dir: walkDir });
+}
+function canWalk() {
+  return pet && !pet.isDestroyed() && pet.isVisible() && calmSent === false && !queue.length && !dragStart && !preview &&
+    data.focus.state !== 'focus' && (data.settings.walk || 'sometimes') !== 'off';
+}
+function scheduleWalk(ms) {
+  clearTimeout(walkTimer);
+  const mode = data.settings.walk || 'sometimes';
+  if (mode === 'off') return;
+  const d = ms != null ? ms : (mode === 'often' ? 60 + Math.random() * 60 : 180 + Math.random() * 180) * 1000 / WALK_SCALE;
+  walkTimer = setTimeout(tryWalk, d);
+}
+function tryWalk() {
+  if (!canWalk()) return scheduleWalk();
+  const b = pet.getBounds(), wa = screen.getDisplayMatching(b).workArea, home = homePos();
+  const minX = wa.x, maxX = wa.x + wa.width - b.width;
+  const away = Math.abs(b.x - home.x) > 4;
+  let target = home.x;
+  if (!away || Math.random() > 0.45) {
+    for (let i = 0; i < 12; i++) {
+      const t = clamp(Math.round(home.x + (Math.random() * 2 - 1) * 520), minX, maxX);
+      if (Math.abs(t - b.x) >= 120) { target = t; break; }
+    }
+  }
+  walkTo(target, () => scheduleWalk());
+}
+function walkTo(x, then) {
+  if (!pet || pet.isDestroyed()) return;
+  clearInterval(walkMover);
+  const b = pet.getBounds(); const y = b.y;
+  if (Math.abs(x - b.x) < 2) { setPose(atHome() ? 'rest' : 'stand'); return then && then(); }
+  setPose('walk', x > b.x ? 1 : -1);
+  let cx = b.x;
+  walkMover = setInterval(() => {
+    if (!pet || pet.isDestroyed()) return clearInterval(walkMover);
+    const step = WALK_SPEED / 20;
+    cx = Math.abs(x - cx) <= step ? x : cx + Math.sign(x - cx) * step;
+    pet.setPosition(Math.round(cx), y);
+    if (cx === x) { clearInterval(walkMover); walkMover = null; setPose(atHome() ? 'rest' : 'stand'); then && then(); }
+  }, 50);
+}
+function atHome() { if (!pet || pet.isDestroyed()) return true; const b = pet.getBounds(), h = homePos(); return Math.abs(b.x - h.x) <= 4 && Math.abs(b.y - h.y) <= 4; }
+function stopWalk() {
+  if (walkMover) { clearInterval(walkMover); walkMover = null; setPose(atHome() ? 'rest' : 'stand'); }
+}
+function walkHome() {
+  if (!pet || pet.isDestroyed() || atHome()) { if (walkPose !== 'rest' && atHome()) setPose('rest'); return; }
+  walkTo(homePos().x, () => { const h = homePos(); pet.setPosition(h.x, h.y); setPose('rest'); scheduleWalk(); });
 }
 
 /* ---------------- automatic updates ----------------
@@ -280,14 +442,21 @@ function upcoming() {
 }
 function petState() {
   return {
-    queue: queue.map(id => id === 'todo-nudge'
+    queue: queue.map(id => id === 'focus-break'
+      ? { id, kind: 'focus', title: `Break time! ${data.focus.breakLen || focusLens().short} min${data.focus.long ? ' (long break)' : ''}`, note: 'Stretch, look away from the screen, sip some water.' + (data.focus.released ? ` ${data.focus.released} reminder${data.focus.released > 1 ? 's' : ''} waited for you.` : ''), mood: 'happy', doneLabel: 'Skip break', laterLabel: 'Stop focusing' }
+      : id === 'focus-next'
+      ? { id, kind: 'focus', title: `Break's over! Ready for round ${(data.focus.round || 0) + 1}?`, note: `${focusLens().focus} minutes of focus.`, mood: 'excited', doneLabel: 'Start', laterLabel: 'Not now' }
+      : id === 'todo-nudge'
       ? { id, kind: 'nudge', title: 'You still have things on your list', todos: openTodos().slice(0, 5).map(t => t.title), more: Math.max(0, openTodos().length - 5) }
       : (() => { const r = data.reminders.find(x => x.id === id); return r && { id, kind: r.type, title: r.title, note: r.note, mood: r.mood || 'auto', overdue: r.type === 'once' && r.at && new Date(r.at).getTime() < Date.now() - 5 * 60000 ? r.at : null }; })()
-    ).filter(Boolean).concat(upd.status === 'ready' && !updDismissed
+    ).filter(Boolean).map(it => it).concat(preview
+      ? [{ id: 'preview', kind: 'preview', title: 'This is how reminders will look', note: `Pet size ${Math.round((eff().size || 1) * 100)}% · Text size ${Math.round((eff().textSize || 1) * 100)}%`, mood: 'happy', doneLabel: 'Apply', laterLabel: 'Cancel' }] : []).concat(upd.status === 'ready' && !updDismissed
       ? [{ id: 'update', kind: 'update', title: `Version ${upd.version} is ready`, note: 'Restart Desktop Pal to finish updating. Your reminders stay as they are.' }] : []),
     next: upcoming().slice(0, 3).map(r => ({ title: r.title, at: r.nextAt })),
     todos: openTodos().length,
-    settings: data.settings
+    settings: eff(),
+    treats: data.treats || 0,
+    focus: { state: data.focus.state, endsAt: data.focus.endsAt, round: data.focus.round, held: data.held.length, lens: focusLens() }
   };
 }
 let lastStateJson = '', stateSends = 0, stateSkips = 0;
@@ -299,7 +468,11 @@ function pushState(alert) {
   pet.webContents.send('state', { ...st, alert });
 }
 function pushManager() { if (manager && !manager.isDestroyed()) manager.webContents.send('data', managerData()); }
-function managerData() { return { reminders: data.reminders, settings: data.settings, queue, update: upd }; }
+function managerData() {
+  if (data.stats.day !== today()) data.stats = { day: today(), sessions: 0, minutes: 0 };
+  return { reminders: data.reminders, settings: data.settings, queue, update: upd, treats: data.treats || 0,
+           focus: { ...data.focus, held: data.held.length, lens: focusLens() }, stats: data.stats, previewing: !!preview };
+}
 
 /* ---------------- windows ---------------- */
 function defaultPos() {
@@ -353,7 +526,7 @@ function resizePet() {
   if (b.width === d.w && b.height === d.h) return;
   const x = b.x + b.width - d.w, y = b.y + b.height - d.h;   // keep the bottom-right corner in place
   pet.setBounds({ x, y, width: d.w, height: d.h });
-  if (data.settings.pos) data.settings.pos = { x, y };
+  if (data.settings.pos && !preview) data.settings.pos = { x: data.settings.pos.x + b.width - d.w, y: data.settings.pos.y + b.height - d.h };
   data.settings.petW = d.w; data.settings.petH = d.h;
 }
 function showPet() {
@@ -380,7 +553,7 @@ function openManager(tab) {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
   });
   manager.loadFile(path.join(__dirname, 'manager.html'), { query: { tab: tab || '' } });
-  manager.on('closed', () => { manager = null; });
+  manager.on('closed', () => { manager = null; cancelPreview(); });
 }
 
 /* ---------------- tray ---------------- */
@@ -389,6 +562,11 @@ function rebuildTray() {
   const visible = pet && !pet.isDestroyed() && pet.isVisible();
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Open Desktop Pal', click: () => openManager() },
+    data.focus.state === 'idle'
+      ? { label: `Start focus (${focusLens().focus} min)`, click: () => startFocus() }
+      : { label: 'Stop focus', click: () => stopFocus() },
+    ...((data.settings.walk || 'sometimes') !== 'off' ? [{ label: 'Go for a walk', click: () => { if (canWalk()) tryWalk(); } }] : []),
+    { label: data.settings.sound ? 'Mute sounds' : 'Unmute sounds', click: () => { data.settings.sound = !data.settings.sound; save(); pushState(false); pushManager(); rebuildTray(); } },
     { label: 'Add a reminder…', click: () => openManager('new') },
     { type: 'separator' },
     visible
@@ -447,9 +625,16 @@ ipcMain.on('pet:done', (_e, id) => complete(id));
 ipcMain.on('pet:snooze', (_e, id, mins) => snooze(id, mins));
 ipcMain.on('pet:open', (_e, tab) => openManager(tab));
 ipcMain.on('pet:hide', (_e, mins) => hidePet(mins));
-ipcMain.on('pet:ready', () => { calmSent = null; lastStateJson = ''; pushState(queue.length > 0); updateCalm(); });
+ipcMain.on('pet:ready', () => { calmSent = null; lastStateJson = ''; pushState(queue.length > 0); updateCalm(); setPose(walkPose); });
+ipcMain.handle('pet:feed', () => { if ((data.treats || 0) < 1) return false; data.treats--; save(); pushState(false); pushManager(); return true; });
+ipcMain.on('pet:focus', (_e, on) => on ? startFocus() : stopFocus());
+ipcMain.handle('mgr:focus', (_e, on) => { on ? startFocus() : stopFocus(); return managerData(); });
+ipcMain.handle('mgr:previewSize', (_e, p) => { previewSize(p); return true; });
+ipcMain.handle('mgr:applySize', () => { applyPreview(); return true; });
+ipcMain.handle('mgr:cancelSize', () => { cancelPreview(); return true; });
+ipcMain.handle('mgr:walkNow', () => { if (canWalk()) tryWalk(); else scheduleWalk(5000); return true; });
 let dragStart = null;
-ipcMain.on('pet:drag-start', () => { dragStart = pet.getPosition(); });
+ipcMain.on('pet:drag-start', () => { stopWalk(); dragStart = pet.getPosition(); });
 ipcMain.on('pet:drag', (_e, dx, dy) => { if (dragStart) pet.setPosition(Math.round(dragStart[0] + dx), Math.round(dragStart[1] + dy)); });
 ipcMain.on('pet:drag-end', () => { if (dragStart) { const [x, y] = pet.getPosition(); data.settings.pos = { x, y }; save(); } dragStart = null; });
 
@@ -490,8 +675,11 @@ ipcMain.handle('mgr:toggle', (_e, id, field) => {
 ipcMain.handle('mgr:settings', (_e, s) => {
   const gpuChanged = 'gpu' in s && !!s.gpu !== !!data.settings.gpu;
   const resize = ('size' in s && s.size !== data.settings.size) || ('textSize' in s && s.textSize !== data.settings.textSize);
+  const walkChanged = 'walk' in s && s.walk !== data.settings.walk;
   data.settings = Object.assign(data.settings, s);
   if (resize) resizePet();
+  if (walkChanged) { if (s.walk === 'off') { clearTimeout(walkTimer); stopWalk(); walkHome(); } else scheduleWalk(); }
+  if (s.focusReminders === 'show' && data.held.length) { releaseHeld(); pushState(true); }
   applyLogin(); save(); pushState(false); pushManager(); rebuildTray();
   if (gpuChanged) {               // drawing mode is fixed at startup: restart to apply
     try { fs.writeFileSync(DATA_FILE(), JSON.stringify({ ...data, queue }, null, 2)); } catch (_) {}
@@ -584,6 +772,9 @@ app.whenReady().then(async () => {
   setTimeout(tick, 1500);
   screen.on('display-removed', () => { if (!validPos(pet.getBounds())) { const p = defaultPos(); pet.setPosition(p.x, p.y); } });
   setupUpdater();
+  if (data.focus.state === 'focus' || data.focus.state === 'break') scheduleFocus();
+  else if (data.focus.state === 'ready' && !queue.includes('focus-next')) queue.unshift('focus-next');
+  scheduleWalk();
   if (firstRun) setTimeout(() => openManager(), 1500);
   if (process.env.OTTER_DEMO) setTimeout(() => fire(data.reminders[0].id), 1200);
 });
