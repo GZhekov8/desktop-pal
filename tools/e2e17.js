@@ -9,7 +9,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function until(fn, ms = 8000, step = 150) { const t = Date.now(); while (Date.now() - t < ms) { try { const v = await fn(); if (v) return v; } catch (_) {} await sleep(step); } return null; }
 const p2 = n => String(n).padStart(2, '0');
 
-async function launch(settings, dueIn = 2500) {
+async function launch(settings, dueIn = 2500, extraEnv = {}) {
   const cfg = fs.mkdtempSync(path.join(os.tmpdir(), 'dp17-')); fs.mkdirSync(cfg + '/Desktop Pal');
   const probe = cfg + '/probe.txt'; fs.writeFileSync(probe, '5|0|explorer.exe\n');
   const due = new Date(Date.now() + dueIn);
@@ -18,7 +18,7 @@ async function launch(settings, dueIn = 2500) {
     settings: { todoNudgeMin: 0, petName: 'Pedro', walk: 'off', bedOn: false, gameBreakMin: 120, ...settings }, lastNudge: Date.now()
   }));
   const app = await electron.launch({ executablePath: ROOT + '/node_modules/electron/dist/electron', args: ['--no-sandbox', ROOT],
-    env: { ...process.env, XDG_CONFIG_HOME: cfg, DP_GAME_PROBE: probe, DP_GAME_ON_MS: '600', DP_GAME_OFF_MS: '1500', DP_GAME_MINUTE_MS: '100', DP_PEEK_MS: '3000' } });
+    env: { ...process.env, XDG_CONFIG_HOME: cfg, DP_GAME_PROBE: probe, DP_GAME_ON_MS: '600', DP_GAME_OFF_MS: '1500', DP_GAME_MINUTE_MS: '100', DP_PEEK_MS: '3000', ...extraEnv } });
   const pet = await app.firstWindow(); const errors = [];
   pet.on('pageerror', e => errors.push(String(e)));
   await pet.waitForSelector('#otterWrap', { state: 'attached' }); await sleep(1500);
@@ -86,6 +86,19 @@ const title = (pet) => pet.locator('#bubble.show .b-title').innerText().catch(()
   await pet.evaluate(() => window.otter.settings({ gaming: true }));
   ok('switched back on: detects the running game', !!(await until(async () => !(await visible()), 5000)));
   ok('no page errors (detection)', errors.length === 0, errors.slice(0, 2).join(' | '));
+  await app.close();
+
+  // ---------------- Mac rules: only games count, not any full-screen app ----------------
+  ({ app, pet, errors, data, game, visible } = await launch({}, 600000, { DP_GAME_PROBE_MAC: '1' }));
+  game('2|1|Pages|public.app-category.productivity'); await sleep(2200);
+  ok('Mac: full-screen normal app is not a game', await visible());
+  game('2|1|Safari|'); await sleep(2200);
+  ok('Mac: full-screen browser is not a game', await visible());
+  game('3|1|Baldur\'s Gate 3|public.app-category.role-playing-games');
+  ok('Mac: full-screen game counts', !!(await until(async () => !(await visible()), 4000)));
+  game('5|0|Finder|');
+  ok('Mac: pet returns after the game', !!(await until(visible, 5000)));
+  ok('no page errors (Mac rules)', errors.length === 0, errors.slice(0, 2).join(' | '));
   await app.close();
 
   console.log(results.join('\n'));

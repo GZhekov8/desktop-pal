@@ -161,6 +161,8 @@ async function petClick(pet) { // real mouse click on the pet (not a drag)
   const slide = async (id, v) => mgr2.evaluate(([id, v]) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); }, [id, v]);
   const petBounds = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('pet.html')).getBounds());
   const b0 = await petBounds();
+  const petCorner = async () => { const b = await petBounds(); const r = await pet.evaluate(() => { const q = document.getElementById('otterWrap').getBoundingClientRect(); return { r: q.right, b: q.bottom }; }); return { x: Math.round(b.x + r.r), y: Math.round(b.y + r.b) }; };
+  const c0 = await petCorner();
   ok('pet size slider has 5% steps from 50% to 150%', await mgr2.evaluate(() => { const e = document.getElementById('s-size'); return e.min === '50' && e.max === '150' && e.step === '5'; }));
   await slide('s-size', 65);
   ok('pet size 65% previewed on the pet', !!(await until(async () => (await pet.locator('#stage').getAttribute('style') || '').includes('--pet: 0.65'))));
@@ -172,7 +174,8 @@ async function petClick(pet) { // real mouse click on the pet (not a drag)
   ok('sample bubble goes away after Apply', !!(await until(async () => !(await pet.locator('#bubble.show').count()))));
   ok('slider label shows 65%', (await mgr2.locator('#o-size').innerText()) === '65%');
   const b1 = await petBounds();
-  ok('window shrinks but keeps its bottom-right corner', b1.x + b1.width === b0.x + b0.width && b1.y + b1.height === b0.y + b0.height && b1.height < b0.height, `${JSON.stringify(b0)} -> ${JSON.stringify(b1)}`);
+  const c1 = await petCorner();
+  ok('pet shrinks but keeps its bottom-right corner on screen', Math.abs(c1.x - c0.x) <= 1 && Math.abs(c1.y - c0.y) <= 1 && b1.height < b0.height, `${JSON.stringify(c0)} -> ${JSON.stringify(c1)}`);
   await slide('s-textSize', 130);
   ok('text size 130% previewed on the bubble only', !!(await until(async () => (await pet.locator('#stage').getAttribute('style') || '').includes('--text: 1.3'))));
   await mgr2.click('#sizeApply');
