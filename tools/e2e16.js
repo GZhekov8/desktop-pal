@@ -8,12 +8,12 @@ function ok(name, cond, extra) { results.push(`${cond ? 'PASS' : 'FAIL'}  ${name
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function until(fn, ms = 8000, step = 150) { const t = Date.now(); while (Date.now() - t < ms) { try { const v = await fn(); if (v) return v; } catch (_) {} await sleep(step); } return null; }
 
-async function launch(settings, extraEnv = {}) {
+async function launch(settings, extraEnv = {}, extraData = {}) {
   const cfg = fs.mkdtempSync(path.join(os.tmpdir(), 'dp16-')); fs.mkdirSync(cfg + '/Desktop Pal');
   const due = new Date(Date.now() + 2500), p = n => String(n).padStart(2, '0');
   fs.writeFileSync(cfg + '/Desktop Pal/otterpal-data.json', JSON.stringify({
     reminders: [{ id: 'r1', type: 'once', title: 'Pay the bill', at: `${due.getFullYear()}-${p(due.getMonth() + 1)}-${p(due.getDate())}T${p(due.getHours())}:${p(due.getMinutes())}`, enabled: true }],
-    settings: { todoNudgeMin: 0, petName: 'Pedro', walk: 'off', ...settings }, lastNudge: Date.now()
+    settings: { todoNudgeMin: 0, petName: 'Pedro', walk: 'off', ...settings }, lastNudge: Date.now(), ...extraData
   }));
   const app = await electron.launch({ executablePath: ROOT + '/node_modules/electron/dist/electron', args: ['--no-sandbox', ROOT],
     env: { ...process.env, XDG_CONFIG_HOME: cfg, DP_FOCUS_MINUTE_MS: '1000', ...extraEnv } });
@@ -77,6 +77,12 @@ const bounds = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAll
   ok('no page errors (treats/petting)', errors.length === 0, errors.slice(0, 2).join(' | '));
   await app.close();
 
+  // ---------------- treats are capped at 10 ----------------
+  ({ app, pet, errors, data } = await launch({}, {}, { treats: 25 }));
+  await pet.evaluate(() => window.otter.done('r1')).catch(() => {});
+  ok('saved-up treats are capped at 10 (old piles trimmed, no 11th)', !!(await until(() => data().treats === 10)), JSON.stringify(data().treats));
+  await app.close();
+
   // ---------------- walking ----------------
   ({ app, pet, errors, data } = await launch({ walk: 'often' }, { DP_WALK_SCALE: '40' }));
   await pet.evaluate(() => window.otter.done('r1')).catch(() => {});
@@ -99,6 +105,13 @@ const bounds = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAll
   await pet.evaluate(() => window.otter.settings({ walk: 'off' }));
   await sleep(3000); const b1 = await bounds(app); await sleep(4000); const b2 = await bounds(app);
   ok('"Off" stops walking', b1.x === b2.x && b2.x === home.x);
+  await pet.evaluate(() => window.otter.walkNow());   // "Walk now" still works as a preview while walking is set to Never
+  const out = await until(async () => { const b = await bounds(app); return Math.abs(b.x - home.x) > 30 && b; }, 8000);
+  ok('"Walk now" works even when walking is Never', !!out, out && `${home.x} -> ${out.x}`);
+  const home2 = await until(async () => { const b = await bounds(app); return b.x === home.x && b; }, 25000);
+  ok('...and the preview stroll comes straight back home', !!home2);
+  await sleep(4000); const b3 = await bounds(app);
+  ok('...and stays home afterwards (still Never)', b3.x === home.x);
   ok('no page errors (walking)', errors.length === 0, errors.slice(0, 2).join(' | '));
   await app.close();
 
