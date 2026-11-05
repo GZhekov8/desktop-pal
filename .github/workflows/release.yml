@@ -39,6 +39,8 @@ jobs:
         with:
           python-version: '3.12'
       - name: Draw the pets (src/pet.html + src/pets/*.json from the art scripts in tools/)
+        env:
+          PYTHONUTF8: '1'      # read/write files as UTF-8 on Windows too (the art has emoji)
         run: |
           pip install matplotlib
           python tools/build.py
@@ -67,6 +69,8 @@ jobs:
         with:
           python-version: '3.12'
       - name: Draw the pets (src/pet.html + src/pets/*.json from the art scripts in tools/)
+        env:
+          PYTHONUTF8: '1'      # read/write files as UTF-8 on Windows too (the art has emoji)
         run: |
           pip install matplotlib
           python tools/build.py
