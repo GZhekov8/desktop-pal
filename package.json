@@ -1,6 +1,6 @@
 {
   "name": "desktop-pal",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "A desktop pet that sits in the corner of your screen and reminds you of things",
   "main": "src/main.js",
   "scripts": {
@@ -57,7 +57,13 @@
       ],
       "icon": "build/icon.ico",
       "signAndEditExecutable": false,
-      "artifactName": "DesktopPal-${version}-Portable.${ext}"
+      "artifactName": "DesktopPal-${version}-Portable.${ext}",
+      "extraResources": [
+        {
+          "from": "native/gamecheck.exe",
+          "to": "gamecheck.exe"
+        }
+      ]
     },
     "nsis": {
       "oneClick": true,
@@ -78,17 +84,68 @@
       "releaseType": "release"
     },
     "electronLanguages": [
+      "en",
       "en-US",
       "en-GB",
+      "en_GB",
       "bg"
     ],
     "compression": "maximum",
-    "extraResources": [
-      {
-        "from": "native/gamecheck.exe",
-        "to": "gamecheck.exe"
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon-mac.png",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "notarize": false,
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSHumanReadableCopyright": "MIT License"
+      },
+      "extraResources": [
+        {
+          "from": "native/gamecheck-mac",
+          "to": "gamecheck"
+        }
+      ],
+      "artifactName": "DesktopPal-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "Desktop Pal ${version}",
+      "artifactName": "DesktopPal-${version}-mac-${arch}.${ext}",
+      "contents": [
+        {
+          "x": 150,
+          "y": 190
+        },
+        {
+          "x": 390,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
       }
-    ]
+    }
   },
   "dependencies": {
     "electron-updater": "^6.8.11"
