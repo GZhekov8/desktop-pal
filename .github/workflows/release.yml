@@ -35,6 +35,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Draw the pets (src/pet.html + src/pets/*.json from the art scripts in tools/)
+        run: |
+          pip install matplotlib
+          python tools/build.py
       - name: Point the app at this repository (updates + Check for updates button)
         shell: bash
         run: |
@@ -56,6 +63,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Draw the pets (src/pet.html + src/pets/*.json from the art scripts in tools/)
+        run: |
+          pip install matplotlib
+          python tools/build.py
       - name: Build the game-check helper (Apple chip + Intel in one file)
         run: |
           swiftc -O -target arm64-apple-macos11 native/gamecheck.swift -o native/gc-arm64
