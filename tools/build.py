@@ -2,7 +2,7 @@ import os as _os
 ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
 import sys
 sys.path.insert(0, ROOT + '/tools')
-from storybook import ANIMALS, DEFS, walker, WALKERS   # storybook-style art for all six pets
+from chibi import ANIMALS, DEFS, walker, WALKERS, FACE   # cute chibi art for all six pets
 s = open(ROOT + '/tools/pet.otter-base.html').read()
 
 def cut(s, a, b):
@@ -28,12 +28,12 @@ for name, fn in ANIMALS.items():
     bk, hd, fr = fn()
     wrap = lambda t: f'<g class="animal a-{name}">{t}</g>'
     if name == 'otter':     # the otter keeps its animated water (back/front) and droplets from the page
-        art['otter']['float'] = wrap(hd.replace('@@FACE@@', face))
+        art['otter']['float'] = wrap(hd.replace('@@FACE@@', FACE))
         continue
-    art[name] = {'back': wrap(bk), 'float': wrap(hd.replace('@@FACE@@', face)), 'float2': '', 'front': wrap(fr) if fr else ''}
+    art[name] = {'back': wrap(bk), 'float': wrap(hd.replace('@@FACE@@', FACE)), 'float2': '', 'front': wrap(fr) if fr else ''}
 anchor = '<linearGradient id="shellG"'
 i = s.index(anchor); s = s[:i] + DEFS + s[i:]
-assert 'id="sbCat"' in s
+assert 'id="cbCat"' in s
 
 # 3./4. back + front layers: otter water moves into the otter file, slots left behind
 a = s.index('      <ellipse cx="118" cy="134" rx="120" ry="30" fill="url(#poolG)"/>')
@@ -50,7 +50,7 @@ squeeze = lambda t: re.sub(r'>\s+<', '><', t).strip()
 def wrap_head(f):
     # wrap the head group in an outer <g class="head"> (no transform of its own) so CSS can turn the
     # head around its real position; the inner group keeps its translate/rotate placement
-    i = f.index('<g transform="translate(19')
+    i = f.index('<g class="headpos"')
     depth, j = 0, i
     for m in re.finditer(r'<g[\s>]|</g>', f[i:]):
         depth += -1 if m.group(0) == '</g>' else 1
@@ -75,11 +75,8 @@ css = '''
   .animal { display: none; }
   .pet-otter .a-otter, .pet-cat .a-cat, .pet-dog .a-dog, .pet-fox .a-fox, .pet-redpanda .a-redpanda, .pet-tiger .a-tiger { display: inline; }
   .pet-cat, .pet-fox { --brow: #8f4515; } .pet-dog { --brow: #6e4420; } .pet-redpanda { --brow: #5a2214; } .pet-tiger { --brow: #2a1a10; }
-  .alert.pet-cat .float, .alert.pet-dog .float, .alert.pet-fox .float, .alert.pet-redpanda .float, .alert.pet-tiger .float { animation: bounce 1.1s ease-in-out infinite; }
-  .alert-tail { transform-box: view-box; }
-  .alert .alert-tail { animation: wag .35s ease-in-out infinite alternate; }
-  .pet-cat.alert .alert-tail, .pet-fox.alert .alert-tail, .pet-tiger.alert .alert-tail { animation: wag 1s ease-in-out infinite alternate; }
-  @keyframes wag { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+  .pet-otter { --iris: #6b4630; } .pet-cat { --iris: #8fbf3c; } .pet-dog { --iris: #7a4a26; } .pet-fox { --iris: #e0a028; } .pet-redpanda { --iris: #8a4a26; } .pet-tiger { --iris: #e6b032; }
+  .alert-tail { transform-box: view-box; }   /* wags and drifts via the motion engine */
   .iris { transition: opacity .25s; }
   .m-happy .iris, .m-love .iris, .m-proud .iris, .m-sleepy .iris { opacity: 0; }
 </style>'''
