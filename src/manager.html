@@ -71,6 +71,68 @@
   .chips button { border: 1px solid #d8cabb; background: #fff; border-radius: 99px; padding: 4px 10px; cursor: pointer; font: 12px "Segoe UI"; }
   .chips button:hover { background: var(--soft); }
   .os-mac { display: none; } .mac .os-mac { display: inline; } .mac .os-win { display: none; }
+
+  /* ---------- warm, hand-made look ---------- */
+  :root { --bg: #f5ede1; --card: #fffaf2; --ink: #3a2c22; --muted: #85705f; --line: #ead9c4; --accent: #e07a3f; --accent-d: #c4652e; --soft: #f4e6d4; }
+  body { background: var(--bg) radial-gradient(circle at 20% 10%, rgba(255,255,255,.55), transparent 40%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='%23c9a985' fill-opacity='.07'%3E%3Ccircle cx='13' cy='17' r='1'/%3E%3Ccircle cx='71' cy='9' r='.8'/%3E%3Ccircle cx='44' cy='58' r='1.1'/%3E%3Ccircle cx='101' cy='47' r='.9'/%3E%3Ccircle cx='23' cy='96' r='.8'/%3E%3Ccircle cx='86' cy='103' r='1'/%3E%3C/g%3E%3C/svg%3E"); }
+  .hand { font-family: "Segoe Print", "Chalkboard SE", "Bradley Hand", "Segoe UI", system-ui, sans-serif; }
+  #tab-set .group { background: var(--card); border: 1.5px solid #e7d3bb; border-radius: 20px 16px 22px 15px / 16px 20px 15px 21px;
+    box-shadow: 0 3px 0 #ead8c1; padding: 6px 20px 4px; margin-bottom: 18px; }
+  #tab-set .group.quiet { background: transparent; box-shadow: none; border-style: dashed; }
+  #tab-set h3 { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px; font: 700 18px "Segoe Print", "Chalkboard SE", "Bradley Hand", "Segoe UI", system-ui; color: #8a4a22; letter-spacing: .01em; }
+  #tab-set .ico { width: 30px; height: 30px; flex: none; fill: none; stroke: #c76a33; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+    background: #fde8d6; border-radius: 50% 46% 52% 44%; padding: 2px; }
+  #tab-set .r { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 13px 0; border-bottom: 1.5px dashed #eddcc7; }
+  #tab-set .r:last-child { border-bottom: 0; }
+  #tab-set .r.col { flex-direction: column; align-items: stretch; gap: 8px; }
+  #tab-set .r small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+  #tab-set .r > div:first-child { font-weight: 600; }
+  #tab-set .lab { display: flex; justify-content: space-between; align-items: flex-start; }
+  #tab-set .lab output { font: 700 13px "Segoe UI", system-ui; color: #a3542a; background: #fde8d6; border-radius: 99px; padding: 2px 10px; font-variant-numeric: tabular-nums; }
+  #tab-set .btns { display: flex; gap: 8px; align-items: center; flex: none; }
+  #tab-set .dash { color: var(--muted); font-size: 12.5px; }
+  #tab-set input[type=text] { width: 180px; } #tab-set input[type=time] { width: 112px; }
+  #tab-set input[type=text], #tab-set input[type=number], #tab-set input[type=time] { border: 1.5px solid #e2cdb3; border-radius: 12px; background: #fffdf9; }
+  #tab-set .unit { display: flex; align-items: center; gap: 6px; } #tab-set .unit input { width: 74px; text-align: center; } #tab-set .unit span { color: var(--muted); font-size: 12.5px; }
+  .note-row { background: #fdeee0; margin: 6px -12px !important; padding: 12px !important; border-radius: 14px; border: 1.5px dashed #f0c49f !important; }
+  /* buttons */
+  #tab-set .btn { border-radius: 12px; background: #f6e7d5; box-shadow: 0 2px 0 #e5ceb2; color: #5e3a22; }
+  #tab-set .btn:hover { background: #f1dcc3; } #tab-set .btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #e5ceb2; }
+  #tab-set .btn.primary { background: var(--accent); color: #fff; box-shadow: 0 2px 0 #b65a28; } #tab-set .btn.primary:hover { background: #d76f35; }
+  /* pill button groups (made from the hidden <select>) */
+  select.pills { display: none; }
+  .pillbar { display: inline-flex; background: #f4e4d0; border-radius: 99px; padding: 3px; gap: 2px; flex: none; }
+  .pillbar button { border: 0; background: transparent; border-radius: 99px; padding: 6px 13px; font: 600 12.5px "Segoe UI", system-ui; color: #85603f; cursor: pointer; }
+  .pillbar button:hover { color: #5e3a22; }
+  .pillbar button.on { background: #fffaf3; color: #b2532a; box-shadow: 0 1.5px 0 #e2c8a8, 0 0 0 1px #edd8bf; }
+  /* sliders with a paw-print handle */
+  .slide { position: relative; padding: 4px 4px 0; }
+  input[type=range].paw { -webkit-appearance: none; appearance: none; width: 100%; height: 12px; border-radius: 99px; outline: none; cursor: pointer; margin: 8px 0;
+    background: linear-gradient(90deg, #f0a46f, var(--accent)) 0 0 / var(--p, 50%) 100% no-repeat, #efdfcb; box-shadow: inset 0 1.5px 2px rgba(120, 70, 30, .18); }
+  input[type=range].paw::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border: 0; border-radius: 50%; cursor: grab;
+    background: #fffaf3 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23d9733a'%3E%3Cpath d='M16 18.4c-3 0-5.6 2-5.4 4.6.2 2.1 2.4 3 5.4 2.9 3 .1 5.2-.8 5.4-2.9.2-2.6-2.4-4.6-5.4-4.6z'/%3E%3Cellipse cx='9.6' cy='14' rx='2.3' ry='2.9' transform='rotate(-18 9.6 14)'/%3E%3Cellipse cx='13.4' cy='9.4' rx='2.3' ry='3' transform='rotate(-6 13.4 9.4)'/%3E%3Cellipse cx='18.8' cy='9.5' rx='2.3' ry='3' transform='rotate(8 18.8 9.5)'/%3E%3Cellipse cx='22.6' cy='14.1' rx='2.3' ry='2.9' transform='rotate(20 22.6 14.1)'/%3E%3C/g%3E%3C/svg%3E") center / 22px no-repeat;
+    box-shadow: 0 2px 0 #d9b892, 0 0 0 2px #f0c49f; transition: transform .12s; }
+  input[type=range].paw:active::-webkit-slider-thumb { cursor: grabbing; transform: scale(1.1) rotate(-8deg); }
+  input[type=range].paw:focus-visible::-webkit-slider-thumb { box-shadow: 0 2px 0 #d9b892, 0 0 0 3px var(--accent); }
+  .ticks { position: relative; height: 18px; margin: 0 15px; font-size: 11.5px; color: var(--muted); }
+  .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .ticks span::before { content: ""; position: absolute; left: 50%; top: -5px; width: 1.5px; height: 4px; background: #dcc3a6; border-radius: 1px; }
+  /* toggles with a little paw on the knob */
+  #tab-set .switch { width: 46px; height: 26px; }
+  #tab-set .switch span { background: #ead8c3; box-shadow: inset 0 1.5px 2px rgba(120, 70, 30, .2); }
+  #tab-set .switch span::before { width: 20px; height: 20px; box-shadow: 0 1.5px 0 #cfb08c;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23e7cdb0'%3E%3Cpath d='M16 18.4c-3 0-5.6 2-5.4 4.6.2 2.1 2.4 3 5.4 2.9 3 .1 5.2-.8 5.4-2.9.2-2.6-2.4-4.6-5.4-4.6z'/%3E%3Cellipse cx='9.6' cy='14' rx='2.3' ry='2.9'/%3E%3Cellipse cx='13.4' cy='9.4' rx='2.3' ry='3'/%3E%3Cellipse cx='18.8' cy='9.5' rx='2.3' ry='3'/%3E%3Cellipse cx='22.6' cy='14.1' rx='2.3' ry='2.9'/%3E%3C/g%3E%3C/svg%3E") center / 14px no-repeat; }
+  #tab-set .switch input:checked + span { background: #7fb27a; }
+  #tab-set .switch input:checked + span::before { transform: translateX(20px); }
+  /* pet picker: little portraits of the real pets */
+  .pets { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .pets button { border: 1.5px solid #ead7c0; background: #fffdf8; border-radius: 16px; padding: 6px 4px 7px; cursor: pointer; font: 600 12px "Segoe UI", system-ui; color: #6b4a33; transition: transform .12s, box-shadow .12s; }
+  .pets button:hover { transform: translateY(-2px) rotate(-1deg); box-shadow: 0 3px 0 #ead8c1; }
+  .pets button.on { border-color: var(--accent); background: #fff3e7; box-shadow: 0 3px 0 #f0c49f; color: #a3471d; }
+  .pets svg { width: 100%; height: 62px; display: block; margin-bottom: 2px; }
+  .pets .x { display: none; } .pets .x-eyes-open, .pets .x-mouth-smile { display: inline; }
+  @media (max-width: 640px) { .pets { grid-template-columns: repeat(3, 1fr); } }
 </style>
 </head>
 <body>
@@ -123,41 +185,68 @@
   </section>
 
   <section id="tab-set" class="hidden">
-    <div class="set">
-      <div class="r"><div>Animal<small>Who keeps you company in the corner</small></div><select id="s-animal">
-        <option value="otter">Sea otter</option><option value="cat">Ginger cat</option><option value="dog">Dog</option><option value="fox">Red fox</option><option value="redpanda">Red panda</option><option value="tiger">Tiger cub</option>
-      </select></div>
-      <div class="r"><div>Pet's name<small>Shown in its speech bubble</small></div><input type="text" id="s-petName" maxlength="20"></div>
-      <div class="r"><div>Pet size<small>How big your pet is on screen</small></div><div class="rng"><input type="range" id="s-size" min="50" max="150" step="5"><output id="o-size">100%</output></div></div>
-      <div class="r hidden" id="previewRow" style="background:#fdf1e7;margin:0 -16px;padding:10px 16px"><div>Previewing on your pet<small>Look at your pet to see the new size, then keep it or go back.</small></div>
-        <div style="display:flex;gap:6px"><button class="btn primary" id="sizeApply">Apply</button><button class="btn" id="sizeCancel">Cancel</button></div></div>
-      <div class="r"><div>Text size<small>Size of the speech bubble, so reminders stay readable even with a small pet</small></div><div class="rng"><input type="range" id="s-textSize" min="80" max="150" step="5"><output id="o-textSize">100%</output></div></div>
-      <div class="r"><div>Motion<small>Lively: gently bobs and breathes. Calm: stays still apart from blinking (uses the least power).</small></div><select id="s-motion"><option value="lively">Lively</option><option value="calm">Calm</option></select></div>
-      <div class="r"><div>Use graphics card<small>Smoother and lighter on the processor. If your pet disappears, turn this off again (from the tray icon → Open Desktop Pal). The app restarts to apply it.</small></div><label class="switch"><input type="checkbox" id="s-gpu"><span></span></label></div>
-      <div class="r"><div>Walks around<small>Your pet strolls along the bottom of the screen now and then, and comes back home.</small></div>
-        <div style="display:flex;gap:6px;align-items:center"><select id="s-walk" style="width:120px"><option value="off">Off</option><option value="sometimes">Sometimes</option><option value="often">Often</option></select><button class="btn small" id="walkNow">Walk now</button></div></div>
-      <div class="r"><div>Gaming mode<small id="gameLine">When a full-screen game is running, your pet hides and reminders wait until you stop playing. Browsers and video players don't count.</small></div><label class="switch"><input type="checkbox" id="s-gaming"><span></span></label></div>
-      <div class="r game-sub"><div>Break nudge while playing<small>Your pet peeks in (without interrupting the game) to suggest a short break</small></div>
-        <select id="s-gameBreakMin" style="width:150px"><option value="0">Off</option><option value="60">Every hour</option><option value="90">Every 1½ hours</option><option value="120">Every 2 hours</option><option value="180">Every 3 hours</option></select></div>
-      <div class="r game-sub"><div>Bedtime warning<small>Peeks in once if you're still playing at this time</small></div>
-        <div style="display:flex;gap:6px;align-items:center"><label class="switch"><input type="checkbox" id="s-bedOn"><span></span></label><input type="time" id="s-bedTime" style="width:110px"></div></div>
-      <div class="r"><div>Sounds<small>Reminder chime and your pet's voice</small></div><label class="switch"><input type="checkbox" id="s-sound"><span></span></label></div>
-      <div class="r"><div>Volume</div><div class="rng"><input type="range" id="s-volume" min="0" max="100" step="5"><output id="o-volume">70%</output></div></div>
-      <div class="r"><div>Animal voice<small>A short purr, bark, squeak or yip when you pet it, feed it or it calls you</small></div><label class="switch"><input type="checkbox" id="s-voices"><span></span></label></div>
-      <div class="r"><div>Quiet hours<small>No sounds during these hours; bubbles still show</small></div>
-        <div style="display:flex;gap:6px;align-items:center"><label class="switch"><input type="checkbox" id="s-quietOn"><span></span></label><input type="time" id="s-quietFrom" style="width:110px"><span style="color:var(--muted)">–</span><input type="time" id="s-quietTo" style="width:110px"></div></div>
-      <div class="r"><div><span class="os-win">Windows notifications too</span><span class="os-mac">Mac notifications too</span><small>Handy if your pet is hidden behind a full-screen app</small></div><label class="switch"><input type="checkbox" id="s-notifications"><span></span></label></div>
-      <div class="r"><div><span class="os-win">Start with Windows</span><span class="os-mac">Open when I log in</span></div><label class="switch"><input type="checkbox" id="s-startWithWindows"><span></span></label></div>
-      <div class="r"><div>Default snooze (minutes)</div><input type="number" id="s-snoozeDefault" min="1" max="240"></div>
-      <div class="r"><div>Nudge me about open to-dos every… (minutes)<small>0 turns to-do nudges off</small></div><input type="number" id="s-todoNudgeMin" min="0" max="600"></div>
-      <div class="r"><div>Try it<small>Make your pet show a reminder now</small></div><button class="btn" id="testBtn">Test reminder</button></div>
+    <div class="group">
+      <h3><svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 21c-3.4 0-6.4 2.3-6.2 5.2.2 2.4 2.8 3.4 6.2 3.3 3.5.1 6-1 6.2-3.3.2-2.9-2.8-5.2-6.2-5.2z"/><ellipse cx="8.6" cy="15.6" rx="2.6" ry="3.3" transform="rotate(-18 8.6 15.6)"/><ellipse cx="13" cy="10.4" rx="2.6" ry="3.4" transform="rotate(-6 13 10.4)"/><ellipse cx="19.2" cy="10.5" rx="2.6" ry="3.4" transform="rotate(8 19.2 10.5)"/><ellipse cx="23.6" cy="15.8" rx="2.6" ry="3.3" transform="rotate(20 23.6 15.8)"/></svg>Your pet</h3>
+      <div class="r col"><div>Who keeps you company<small>Pick a friend for the corner of your screen</small></div>
+        <select id="s-animal" class="hidden">
+          <option value="otter">Sea otter</option><option value="cat">Ginger cat</option><option value="dog">Dog</option><option value="fox">Red fox</option><option value="redpanda">Red panda</option><option value="tiger">Tiger cub</option>
+        </select>
+        <div class="pets" id="petPicker"></div>
+      </div>
+      <div class="r"><div>Name<small>Shown in its speech bubble</small></div><input type="text" id="s-petName" maxlength="20"></div>
+      <div class="r col"><div class="lab"><span>Pet size<small>How big your pet is on screen</small></span><output id="o-size">100%</output></div>
+        <div class="slide"><input type="range" class="paw" id="s-size" min="50" max="150" step="5"><div class="ticks" data-min="50" data-max="150"><span data-v="50">Tiny</span><span data-v="100">Normal</span><span data-v="150">Big</span></div></div></div>
+      <div class="r hidden note-row" id="previewRow"><div>Trying it on your pet<small>Have a look at your pet, then keep the new size or go back.</small></div>
+        <div class="btns"><button class="btn primary" id="sizeApply">Keep it</button><button class="btn" id="sizeCancel">Go back</button></div></div>
+      <div class="r col"><div class="lab"><span>Bubble text size<small>So reminders stay easy to read, even with a small pet</small></span><output id="o-textSize">100%</output></div>
+        <div class="slide"><input type="range" class="paw" id="s-textSize" min="80" max="150" step="5"><div class="ticks" data-min="80" data-max="150"><span data-v="80">Small</span><span data-v="100">Normal</span><span data-v="150">Large</span></div></div></div>
+      <div class="r"><div>Moves<small>Lively: bobs and breathes. Calm: only blinks (uses the least power)</small></div>
+        <select id="s-motion" class="pills"><option value="lively">Lively</option><option value="calm">Calm</option></select></div>
+      <div class="r"><div>Goes for walks<small>Strolls along the bottom of the screen now and then, then comes home</small></div>
+        <div class="btns"><select id="s-walk" class="pills"><option value="off">Never</option><option value="sometimes">Sometimes</option><option value="often">Often</option></select><button class="btn small" id="walkNow">Walk now</button></div></div>
     </div>
-    <div class="set" style="margin-top:14px">
-      <div class="r"><div>About<small id="aboutLine">Desktop Pal</small></div><button class="btn" id="updBtn">Check for updates</button></div>
-      <div class="r"><div>Privacy<small>Your reminders stay on this computer. Desktop Pal does not collect, send or share any data, and needs no account.</small></div></div>
+
+    <div class="group">
+      <h3><svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 22.6c1.6-1.8 1.9-4.2 1.9-7.2 0-3.4 2.1-6 4.8-6.4 3-.4 5.6 2.2 5.8 5.8.2 3.4.3 5.9 2 7.7.4.5.1 1.2-.5 1.2H9.9c-.6 0-.9-.6-.5-1.1z"/><path d="M13.6 25.6c.5 1.4 1.4 2.1 2.6 2.1 1.2 0 2.1-.7 2.5-2.1"/><path d="M16 9V6.6"/></svg>Reminders</h3>
+      <div class="r"><div>Snooze for<small>How long "Snooze" waits</small></div><div class="unit"><input type="number" id="s-snoozeDefault" min="1" max="240"><span>min</span></div></div>
+      <div class="r"><div>Nudge me about open to-dos<small>Every so many minutes · 0 turns it off</small></div><div class="unit"><input type="number" id="s-todoNudgeMin" min="0" max="600"><span>min</span></div></div>
+      <div class="r"><div><span class="os-win">Windows notifications too</span><span class="os-mac">Mac notifications too</span><small>Handy if your pet is hidden behind a full-screen app</small></div><label class="switch"><input type="checkbox" id="s-notifications"><span></span></label></div>
+      <div class="r"><div>Try it<small>Your pet shows a reminder right now</small></div><button class="btn" id="testBtn">Show a test reminder</button></div>
+    </div>
+
+    <div class="group">
+      <h3><svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><path d="M12.4 23.4V9.2l11-2.6v14.2"/><ellipse cx="9.8" cy="23.6" rx="3" ry="2.4"/><ellipse cx="20.8" cy="21" rx="3" ry="2.4"/><path d="M12.4 13.4l11-2.6"/></svg>Sounds</h3>
+      <div class="r"><div>Sounds<small>Reminder chime and your pet's voice</small></div><label class="switch"><input type="checkbox" id="s-sound"><span></span></label></div>
+      <div class="r col"><div class="lab"><span>Volume</span><output id="o-volume">70%</output></div>
+        <div class="slide"><input type="range" class="paw" id="s-volume" min="0" max="100" step="5"><div class="ticks" data-min="0" data-max="100"><span data-v="0">Whisper</span><span data-v="100">Loud</span></div></div></div>
+      <div class="r"><div>Animal voice<small>A purr, bark, chirp or chuff when you pet it, feed it or it calls you</small></div><label class="switch"><input type="checkbox" id="s-voices"><span></span></label></div>
+      <div class="r"><div>Quiet hours<small>No sounds at these times; bubbles still show</small></div>
+        <div class="btns"><label class="switch"><input type="checkbox" id="s-quietOn"><span></span></label><input type="time" id="s-quietFrom"><span class="dash">to</span><input type="time" id="s-quietTo"></div></div>
+    </div>
+
+    <div class="group">
+      <h3><svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.6 11.6h12.8c3.2 0 5.2 3 5.6 7.4.3 3.4-.9 5.6-2.8 5.6-1.6 0-2.6-1.4-3.8-3H10.6c-1.2 1.6-2.2 3-3.8 3-1.9 0-3.1-2.2-2.8-5.6.4-4.4 2.4-7.4 5.6-7.4z"/><path d="M10.4 15.4v4.4M8.2 17.6h4.4"/><circle cx="21.2" cy="16.2" r=".9"/><circle cx="23.6" cy="18.6" r=".9"/></svg>Gaming</h3>
+      <div class="r"><div>Gaming mode<small id="gameLine">When a full-screen game is running, your pet hides and reminders wait until you stop playing.</small></div><label class="switch"><input type="checkbox" id="s-gaming"><span></span></label></div>
+      <div class="r game-sub"><div>Break nudge<small>Your pet peeks in to suggest a short break</small></div>
+        <select id="s-gameBreakMin" class="pills"><option value="0">Off</option><option value="60">1 h</option><option value="90">1½ h</option><option value="120">2 h</option><option value="180">3 h</option></select></div>
+      <div class="r game-sub"><div>Bedtime warning<small>Peeks in once if you're still playing at this time</small></div>
+        <div class="btns"><label class="switch"><input type="checkbox" id="s-bedOn"><span></span></label><input type="time" id="s-bedTime"></div></div>
+    </div>
+
+    <div class="group">
+      <h3><svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="4.2"/><path d="M16 5.6v3.2M16 23.2v3.2M5.6 16h3.2M23.2 16h3.2M8.6 8.6l2.3 2.3M21.1 21.1l2.3 2.3M8.6 23.4l2.3-2.3M21.1 10.9l2.3-2.3"/></svg>App</h3>
+      <div class="r"><div><span class="os-win">Start with Windows</span><span class="os-mac">Open when I log in</span><small>Your pet is there as soon as you sign in</small></div><label class="switch"><input type="checkbox" id="s-startWithWindows"><span></span></label></div>
+      <div class="r"><div>Use the graphics card<small>Smoother and lighter on the processor. If your pet disappears, turn this off again here. The app restarts to apply it.</small></div><label class="switch"><input type="checkbox" id="s-gpu"><span></span></label></div>
+    </div>
+
+    <div class="group quiet">
+      <h3><svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 25.4c-5.6-3.8-9.4-7.2-9.4-11.4 0-2.8 2.1-4.8 4.6-4.8 2 0 3.6 1.2 4.8 3 1.2-1.8 2.8-3 4.8-3 2.5 0 4.6 2 4.6 4.8 0 4.2-3.8 7.6-9.4 11.4z"/></svg>About</h3>
+      <div class="r"><div>Desktop Pal<small id="aboutLine">Desktop Pal</small></div><button class="btn" id="updBtn">Check for updates</button></div>
+      <div class="r"><div>Privacy<small>Your reminders stay on this computer. Desktop Pal doesn't collect, send or share any data, and needs no account.</small></div></div>
       <div class="r"><div>License<small>Free to use and share (MIT License). Built with Electron.</small></div></div>
     </div>
-    <p class="help">Tips: drag your pet anywhere on screen · click it to see what's next · double-click or right-click to open this window · the tray icon (bottom-right, near the clock) lets you hide it or quit. Your reminders are saved on this computer.</p>
+    <p class="help">Tips: drag your pet anywhere on screen · click it to see what's next · double-click or right-click it to open this window · the tray icon lets you hide it or quit.</p>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><!--SBDEFS--><radialGradient id="sbShadow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#1b130c" stop-opacity="0.28"/><stop offset="1" stop-color="#1b130c" stop-opacity="0"/></radialGradient><linearGradient id="sbCat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6b46c"/><stop offset="0.55" stop-color="#e8964b"/><stop offset="1" stop-color="#c46f2e"/></linearGradient><radialGradient id="sbCatHead" cx="0.5" cy="0.4" r="0.65"><stop offset="0" stop-color="#f8bf7c"/><stop offset="0.7" stop-color="#ea9a50"/><stop offset="1" stop-color="#cf7934"/></radialGradient><linearGradient id="sbCushion" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb3bf"/><stop offset="1" stop-color="#4f7280"/></linearGradient><linearGradient id="sbDog" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2b07a"/><stop offset="0.6" stop-color="#c98d51"/><stop offset="1" stop-color="#9f6633"/></linearGradient><radialGradient id="sbDogHead" cx="0.5" cy="0.4" r="0.65"><stop offset="0" stop-color="#e9bb85"/><stop offset="0.75" stop-color="#cf9558"/><stop offset="1" stop-color="#ad7038"/></radialGradient><linearGradient id="sbBed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9a48f"/><stop offset="1" stop-color="#7d6a58"/></linearGradient><linearGradient id="sbFox" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6a25c"/><stop offset="0.55" stop-color="#e57a32"/><stop offset="1" stop-color="#b9541b"/></linearGradient><radialGradient id="sbFoxHead" cx="0.5" cy="0.4" r="0.65"><stop offset="0" stop-color="#f8ad68"/><stop offset="0.75" stop-color="#e8803a"/><stop offset="1" stop-color="#c25d20"/></radialGradient><linearGradient id="sbMoss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8aa152"/><stop offset="1" stop-color="#4f6130"/></linearGradient><linearGradient id="sbRp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#df7a48"/><stop offset="0.55" stop-color="#c4532a"/><stop offset="1" stop-color="#8a3318"/></linearGradient><radialGradient id="sbRpHead" cx="0.5" cy="0.4" r="0.65"><stop offset="0" stop-color="#e7895a"/><stop offset="0.75" stop-color="#c9592e"/><stop offset="1" stop-color="#9c3c1c"/></radialGradient><linearGradient id="sbBark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a4c"/><stop offset="0.5" stop-color="#6a4c34"/><stop offset="1" stop-color="#43301f"/></linearGradient><linearGradient id="sbLimb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a1c12"/><stop offset="1" stop-color="#1f0e09"/></linearGradient><linearGradient id="sbTig" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f9b062"/><stop offset="0.55" stop-color="#ec8a32"/><stop offset="1" stop-color="#c4641c"/></linearGradient><radialGradient id="sbTigHead" cx="0.5" cy="0.4" r="0.65"><stop offset="0" stop-color="#fbbb70"/><stop offset="0.75" stop-color="#ee903a"/><stop offset="1" stop-color="#cf6c20"/></radialGradient><linearGradient id="sbRock" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c3b6a5"/><stop offset="0.55" stop-color="#9a8c7b"/><stop offset="1" stop-color="#695e52"/></linearGradient><linearGradient id="sbOtter" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f6749"/><stop offset="0.55" stop-color="#6e4a33"/><stop offset="1" stop-color="#4a2f1f"/></linearGradient><linearGradient id="sbOtterChest" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9c2a3"/><stop offset="1" stop-color="#b39373"/></linearGradient><radialGradient id="sbOtterHead" cx="0.5" cy="0.4" r="0.65"><stop offset="0" stop-color="#e7d6bd"/><stop offset="0.7" stop-color="#cdb391"/><stop offset="1" stop-color="#a8896a"/></radialGradient><linearGradient id="sbOtterFlip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4b3022"/><stop offset="1" stop-color="#2a1a12"/></linearGradient><linearGradient id="sbShell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4ece2"/><stop offset="1" stop-color="#c9b8a6"/></linearGradient><!--/SBDEFS--></defs></svg>
   </section>
 </main>
 
@@ -304,6 +393,7 @@ function render() {
   const st = D.stats || {}; $('#focusStats').textContent = `${st.sessions || 0} session${st.sessions === 1 ? '' : 's'} · ${st.minutes || 0} min focused`;
   $('#treatsLine').textContent = `${D.treats || 0} treat${D.treats === 1 ? '' : 's'} saved up`;
   $('#previewRow').classList.toggle('hidden', !D.previewing);
+  syncPills(); fillRanges(); syncAnimal();
 }
 for (const k of ['petName','snoozeDefault','todoNudgeMin','animal','motion']) $('#s-' + k).onchange = (e) => {
   const v = k === 'petName' ? (e.target.value.trim() || 'Ollie') : (k === 'animal' || k === 'motion') ? e.target.value : Number(e.target.value);
@@ -418,6 +508,41 @@ window.otter.get().then((d) => {
   if (tab === 'new') openForm(); else if (tab) showTab(tab);
 });
 setInterval(render, 30000);
+
+// ---------- hand-made controls: pill groups, paw sliders, pet portraits ----------
+function syncPills() {
+  for (const sel of document.querySelectorAll('select.pills')) {
+    let bar = sel.nextElementSibling;
+    if (!bar || !bar.classList.contains('pillbar')) {
+      bar = document.createElement('div'); bar.className = 'pillbar'; sel.after(bar);
+      for (const o of sel.options) { const b = document.createElement('button'); b.type = 'button'; b.textContent = o.textContent; b.dataset.v = o.value;
+        b.onclick = () => { sel.value = o.value; sel.dispatchEvent(new Event('change')); syncPills(); }; bar.appendChild(b); }
+    }
+    for (const b of bar.children) b.classList.toggle('on', b.dataset.v === sel.value);
+  }
+}
+function fillRanges() {
+  for (const r of document.querySelectorAll('input[type=range].paw')) r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min) * 100) + '%');
+}
+document.addEventListener('input', (e) => { if (e.target.matches && e.target.matches('input[type=range].paw')) fillRanges(); });
+for (const t of document.querySelectorAll('.ticks')) {
+  const min = Number(t.dataset.min), max = Number(t.dataset.max);
+  for (const sp of t.children) sp.style.left = ((Number(sp.dataset.v) - min) / (max - min) * 100) + '%';
+}
+const PET_VIEW = { otter: '160 46 72 72', cat: '158 38 76 76', dog: '156 42 76 76', fox: '158 34 76 76', redpanda: '158 42 76 76', tiger: '157 44 78 78' };
+async function buildPetPicker() {
+  const box = document.getElementById('petPicker'), sel = document.getElementById('s-animal');
+  for (const o of sel.options) {
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.v = o.value;
+    b.innerHTML = `<svg viewBox="${PET_VIEW[o.value] || '156 40 80 80'}"></svg><span>${o.textContent}</span>`;
+    b.onclick = () => { sel.value = o.value; sel.dispatchEvent(new Event('change')); syncAnimal(); };
+    box.appendChild(b);
+    try { const a = await window.otter.art(o.value); if (a) b.querySelector('svg').innerHTML = a.float; } catch (_) {}
+  }
+  syncAnimal();
+}
+function syncAnimal() { const v = document.getElementById('s-animal').value; for (const b of document.querySelectorAll('#petPicker button')) b.classList.toggle('on', b.dataset.v === v); }
+buildPetPicker();
 </script>
 </body>
 </html>
