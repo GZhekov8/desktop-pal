@@ -391,7 +391,7 @@ function render() {
     : f.state === 'break' ? `On a break · about ${left} min left` : f.state === 'ready' ? 'Break is over, ready for the next round' : `Not focusing · next session ${L.focus} min`;
   $('#focusBtn').textContent = f.state === 'idle' ? 'Start focus' : f.state === 'ready' ? 'Start next round' : 'Stop';
   const st = D.stats || {}; $('#focusStats').textContent = `${st.sessions || 0} session${st.sessions === 1 ? '' : 's'} · ${st.minutes || 0} min focused`;
-  $('#treatsLine').textContent = `${D.treats || 0} treat${D.treats === 1 ? '' : 's'} saved up`;
+  $('#treatsLine').textContent = `${D.treats || 0} treat${D.treats === 1 ? '' : 's'} saved up` + ((D.treats || 0) >= 10 ? ' (full, feed your pet!)' : '');
   $('#previewRow').classList.toggle('hidden', !D.previewing);
   syncPills(); fillRanges(); syncAnimal();
 }

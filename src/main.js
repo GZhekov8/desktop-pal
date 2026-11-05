@@ -22,6 +22,7 @@ app.setAppUserModelId(APP_ID);
 const EARLY = (() => { try { return JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'otterpal-data.json'), 'utf8')).settings || {}; } catch (_) { return {}; } })();
 if (!EARLY.gpu) app.disableHardwareAcceleration();
 
+const MAX_TREATS = 10;   // the pet can save up at most this many, so forgotten treats don't pile up
 function log(...a) {
   try { fs.appendFileSync(path.join(app.getPath('userData'), 'otterpal.log'), new Date().toISOString() + ' ' + a.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' ') + '\n'); } catch (_) {}
 }
@@ -106,7 +107,7 @@ function load() {
     data.reminders = raw.reminders || [];
     data.settings = Object.assign(data.settings, raw.settings || {});
     data.lastNudge = raw.lastNudge || 0;
-    data.treats = raw.treats || 0;
+    data.treats = Math.min(MAX_TREATS, raw.treats || 0);
     data.focus = Object.assign(data.focus, raw.focus || {});
     data.stats = Object.assign(data.stats, raw.stats || {});
     data.game = Object.assign(data.game, raw.game || {});
@@ -295,7 +296,7 @@ function snooze(id, mins) {
 function afterQueue() { if (!queue.length && walkPose !== 'rest') setTimeout(() => { if (!queue.length) walkHome(); }, 1500); }
 
 /* ---------------- treats: earned by finishing reminders and focus sessions ---------------- */
-function earnTreat(why) { data.treats = Math.min(99, (data.treats || 0) + 1); data.lastTreat = { at: Date.now(), why }; }
+function earnTreat(why) { data.treats = Math.min(MAX_TREATS, (data.treats || 0) + 1); data.lastTreat = { at: Date.now(), why }; }
 
 /* ---------------- focus timer ---------------- */
 const MIN = Number(process.env.DP_FOCUS_MINUTE_MS) || 60000;   // tests shrink minutes
@@ -505,9 +506,10 @@ function setPose(p, dir) {
   if (pet && !pet.isDestroyed()) pet.webContents.send('pose', { pose: p, dir: walkDir });
   if (p !== 'walk') pushState(false);      // the bubble side may have changed
 }
-function canWalk() {
+// manual = "Walk now" / "Go for a walk": allowed even when walking is set to Never (a test / preview)
+function canWalk(manual) {
   return pet && !pet.isDestroyed() && pet.isVisible() && calmSent === false && !queue.length && !dragStart && !preview &&
-    !gaming && data.focus.state !== 'focus' && (data.settings.walk || 'sometimes') !== 'off';
+    !gaming && data.focus.state !== 'focus' && (manual || (data.settings.walk || 'sometimes') !== 'off');
 }
 function scheduleWalk(ms) {
   clearTimeout(walkTimer);
@@ -516,21 +518,25 @@ function scheduleWalk(ms) {
   const d = ms != null ? ms : (mode === 'often' ? 60 + Math.random() * 60 : 180 + Math.random() * 180) * 1000 / WALK_SCALE;
   walkTimer = setTimeout(tryWalk, d);
 }
-function tryWalk() {
-  if (!canWalk()) return scheduleWalk();
+function tryWalk(manual) {
+  if (!canWalk(manual)) return scheduleWalk();
+  const trial = manual && (data.settings.walk || 'sometimes') === 'off';   // walking is off: a short stroll out and straight back home
   const b = pet.getBounds(), wa = screen.getDisplayMatching(b).workArea, home = homePos(), d = petDims();
   // the window is wider than the pet: limits are where the pet itself reaches the screen edges
   const offL = b.width - d.petR - d.petW;
   const minX = Math.round(wa.x - offL + 4), maxX = Math.round(wa.x + wa.width - b.width + d.petR - 4);
   const away = Math.abs(b.x - home.x) > 4;
   let target = home.x;
-  if (!away || Math.random() > 0.45) {
+  if (!away || trial || Math.random() > 0.45) {
     const r = petRect(b, d), toMiddle = r.x + r.w / 2 < wa.x + wa.width / 2 ? 1 : -1;   // mostly stroll towards the middle of the screen
     for (let i = 0; i < 12; i++) {
       const dir = Math.random() < 0.8 ? toMiddle : -toMiddle;
       const t = clamp(Math.round(b.x + dir * (140 + Math.random() * 380)), minX, maxX);
       if (Math.abs(t - b.x) >= 120) { target = t; break; }
     }
+  }
+  if (trial) {
+    return walkTo(target, () => { walkPause = setTimeout(() => { walkPause = null; walkHome(); }, 1200 / Math.sqrt(WALK_SCALE)); });
   }
   // on longer strolls, sometimes stop halfway to stand and look around for a moment
   if (Math.abs(target - b.x) > 260 && Math.random() < 0.4) {
@@ -762,7 +768,7 @@ function rebuildTray() {
     data.focus.state === 'idle'
       ? { label: `Start focus (${focusLens().focus} min)`, click: () => startFocus() }
       : { label: 'Stop focus', click: () => stopFocus() },
-    ...((data.settings.walk || 'sometimes') !== 'off' ? [{ label: 'Go for a walk', click: () => { if (canWalk()) tryWalk(); } }] : []),
+    { label: 'Go for a walk', click: () => { if (canWalk(true)) tryWalk(true); } },
     { label: gaming ? `Gaming mode (playing${gameExe ? ' ' + gameExe.replace(/\.exe$/, '') : ''})` : 'Gaming mode', type: 'checkbox', checked: data.settings.gaming !== false,
       click: (mi) => { data.settings.gaming = mi.checked; if (mi.checked) startGameProbe(); else { stopGameProbe(); if (gaming) gameOver(); } save(); pushManager(); rebuildTray(); } },
     { label: data.settings.sound ? 'Mute sounds' : 'Unmute sounds', click: () => { data.settings.sound = !data.settings.sound; save(); pushState(false); pushManager(); rebuildTray(); } },
@@ -837,7 +843,7 @@ ipcMain.handle('mgr:focus', (_e, on) => { on ? startFocus() : stopFocus(); retur
 ipcMain.handle('mgr:previewSize', (_e, p) => { previewSize(p); return true; });
 ipcMain.handle('mgr:applySize', () => { applyPreview(); return true; });
 ipcMain.handle('mgr:cancelSize', () => { cancelPreview(); return true; });
-ipcMain.handle('mgr:walkNow', () => { if (canWalk()) tryWalk(); else scheduleWalk(5000); return true; });
+ipcMain.handle('mgr:walkNow', () => { if (canWalk(true)) tryWalk(true); else if ((data.settings.walk || 'sometimes') !== 'off') scheduleWalk(5000); return true; });
 let dragStart = null;
 ipcMain.on('pet:drag-start', () => { stopWalk(); dragStart = pet.getPosition(); });
 ipcMain.on('pet:drag', (_e, dx, dy) => { if (dragStart) pet.setPosition(Math.round(dragStart[0] + dx), Math.round(dragStart[1] + dy)); });
