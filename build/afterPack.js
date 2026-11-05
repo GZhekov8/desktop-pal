@@ -1,6 +1,15 @@
 // Sets the exe icon + version info without Wine (pure JS via resedit).
 const ResEdit = require('resedit'); const fs = require('fs'); const path = require('path');
 exports.default = async (ctx) => {
+  if (ctx.electronPlatformName === 'darwin') {
+    // No paid Apple certificate: give the app an "ad-hoc" signature, which Apple-chip Macs require to open it at all.
+    // (Users still confirm once in System Settings → Privacy & Security → Open Anyway.)
+    if (process.platform !== 'darwin') return;
+    const app = path.join(ctx.appOutDir, ctx.packager.appInfo.productFilename + '.app');
+    require('child_process').execFileSync('codesign', ['--force', '--deep', '--sign', '-', app], { stdio: 'inherit' });
+    console.log('  • afterPack: ad-hoc signed', app);
+    return;
+  }
   if (ctx.electronPlatformName !== 'win32') return;
   const name = ctx.packager.appInfo.productFilename, ver = ctx.packager.appInfo.version;
   const exePath = path.join(ctx.appOutDir, name + '.exe');
