@@ -36,7 +36,7 @@ const out = path.join(ROOT, 'smoke'); fs.mkdirSync(out, { recursive: true });
   const pet = await app.firstWindow(); pet.on('pageerror', e => errors.push(String(e)));
   await pet.waitForSelector('#otterWrap', { state: 'attached', timeout: 20000 });
   ok('pet window opens', true, process.platform + ' ' + process.arch);
-  ok('pet artwork is drawn', !!(await until(() => pet.evaluate(() => document.querySelectorAll('#slot-float path').length > 50))));
+  ok('pet artwork is drawn', !!(await until(() => pet.evaluate(() => document.querySelectorAll('#slot-float path').length > 15))));
   const info = await app.evaluate(({ BrowserWindow, app }) => {
     const w = BrowserWindow.getAllWindows().find(x => x.webContents.getURL().includes('pet.html'));
     return { visible: w.isVisible(), top: w.isAlwaysOnTop(), b: w.getBounds(), name: app.getName(), dock: process.platform === 'darwin' ? app.dock.isVisible() : null };

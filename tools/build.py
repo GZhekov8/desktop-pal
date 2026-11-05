@@ -2,7 +2,7 @@ import os as _os
 ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
 import sys
 sys.path.insert(0, ROOT + '/tools')
-from animals import ANIMALS, DEFS, neck, walker, WALKERS
+from storybook import ANIMALS, DEFS, walker, WALKERS   # storybook-style art for all six pets
 s = open(ROOT + '/tools/pet.otter-base.html').read()
 
 def cut(s, a, b):
@@ -26,12 +26,14 @@ s = s[:a] + '<g id="slot-float2"></g>\n' + s[b:]
 
 for name, fn in ANIMALS.items():
     bk, hd, fr = fn()
-    k = hd.index('<g transform="translate(19')
-    hd = hd[:k] + neck(name) + '\n        ' + hd[k:]
-    art[name] = {'back': bk, 'float': hd.replace('@@FACE@@', face), 'float2': '', 'front': fr}
+    wrap = lambda t: f'<g class="animal a-{name}">{t}</g>'
+    if name == 'otter':     # the otter keeps its animated water (back/front) and droplets from the page
+        art['otter']['float'] = wrap(hd.replace('@@FACE@@', face))
+        continue
+    art[name] = {'back': wrap(bk), 'float': wrap(hd.replace('@@FACE@@', face)), 'float2': '', 'front': wrap(fr) if fr else ''}
 anchor = '<linearGradient id="shellG"'
 i = s.index(anchor); s = s[:i] + DEFS + s[i:]
-assert 'id="catBodyG"' in s
+assert 'id="sbCat"' in s
 
 # 3./4. back + front layers: otter water moves into the otter file, slots left behind
 a = s.index('      <ellipse cx="118" cy="134" rx="120" ry="30" fill="url(#poolG)"/>')
@@ -103,4 +105,8 @@ async function loadArt(animal) {
 
 /* ---- facial expressions ---- */""", 1)
 open(ROOT + '/src/pet.html', 'w').write(s)
+# the settings window shows little portraits of the pets: give it the same colour gradients
+m = open(ROOT + '/src/manager.html', encoding='utf-8').read()
+a, z = m.index('<!--SBDEFS-->') + len('<!--SBDEFS-->'), m.index('<!--/SBDEFS-->')
+open(ROOT + '/src/manager.html', 'w', encoding='utf-8').write(m[:a] + DEFS + m[z:])
 print('ok', len(s))
