@@ -390,7 +390,7 @@ function playedText() {
   const m = Math.round((Date.now() - (data.game.lastBreak || gameSince)) / GMIN), h = Math.floor(m / 60);
   return h ? `${h} hour${h > 1 ? 's' : ''}${m % 60 >= 10 ? ` ${m % 60} min` : ''}` : `${m} minutes`;
 }
-function treatEmojiFor() { return ({ otter: '🐟', cat: '🐟', dog: '🦴', fox: '🍇', redpanda: '🎋' })[data.settings.animal] || '🍪'; }
+function treatEmojiFor() { return ({ otter: '🐟', cat: '🐟', dog: '🦴', fox: '🍇', redpanda: '🎋', tiger: '🍖' })[data.settings.animal] || '🍪'; }
 function readProbe(line) {
   const [q, full, exe = '', cat = ''] = String(line).trim().split('|'); const e = exe.trim().toLowerCase();
   // Windows: any full-screen app except browsers/players. Mac: only apps the helper recognises as games (state 3).
@@ -843,7 +843,7 @@ ipcMain.on('pet:drag-start', () => { stopWalk(); dragStart = pet.getPosition(); 
 ipcMain.on('pet:drag', (_e, dx, dy) => { if (dragStart) pet.setPosition(Math.round(dragStart[0] + dx), Math.round(dragStart[1] + dy)); });
 ipcMain.on('pet:drag-end', () => { if (dragStart) { keepPetOnScreen(); const [x, y] = pet.getPosition(); data.settings.pos = { x, y }; save(); pushState(false); } dragStart = null; });
 
-const ANIMALS = ['otter', 'cat', 'dog', 'fox', 'redpanda'];
+const ANIMALS = ['otter', 'cat', 'dog', 'fox', 'redpanda', 'tiger'];
 const artCache = new Map();
 ipcMain.handle('pet:art', (_e, animal) => {
   if (!ANIMALS.includes(animal)) return null;

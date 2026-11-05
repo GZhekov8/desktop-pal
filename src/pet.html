@@ -167,12 +167,12 @@
   .m-chew1 :is(.x-eyes-happy,.x-mouth-o,.x-blush), .m-chew2 :is(.x-eyes-happy,.x-mouth-smile,.x-blush) { opacity: 1; }
   /* ---------- choice of animal ---------- */
   .animal { display: none; }
-  .pet-otter .a-otter, .pet-cat .a-cat, .pet-dog .a-dog, .pet-fox .a-fox, .pet-redpanda .a-redpanda { display: inline; }
-  .pet-cat, .pet-fox { --brow: #8f4515; } .pet-dog { --brow: #6e4420; } .pet-redpanda { --brow: #5a2214; }
-  .alert.pet-cat .float, .alert.pet-dog .float, .alert.pet-fox .float, .alert.pet-redpanda .float { animation: bounce 1.1s ease-in-out infinite; }
+  .pet-otter .a-otter, .pet-cat .a-cat, .pet-dog .a-dog, .pet-fox .a-fox, .pet-redpanda .a-redpanda, .pet-tiger .a-tiger { display: inline; }
+  .pet-cat, .pet-fox { --brow: #8f4515; } .pet-dog { --brow: #6e4420; } .pet-redpanda { --brow: #5a2214; } .pet-tiger { --brow: #2a1a10; }
+  .alert.pet-cat .float, .alert.pet-dog .float, .alert.pet-fox .float, .alert.pet-redpanda .float, .alert.pet-tiger .float { animation: bounce 1.1s ease-in-out infinite; }
   .alert-tail { transform-box: view-box; }
   .alert .alert-tail { animation: wag .35s ease-in-out infinite alternate; }
-  .pet-cat.alert .alert-tail, .pet-fox.alert .alert-tail { animation: wag 1s ease-in-out infinite alternate; }
+  .pet-cat.alert .alert-tail, .pet-fox.alert .alert-tail, .pet-tiger.alert .alert-tail { animation: wag 1s ease-in-out infinite alternate; }
   @keyframes wag { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
   .iris { transition: opacity .25s; }
   .m-happy .iris, .m-love .iris, .m-proud .iris, .m-sleepy .iris { opacity: 0; }
@@ -254,6 +254,9 @@
 <radialGradient id="foxHeadG" cx="50%" cy="35%" r="62%"><stop offset="0" stop-color="#ec9145"/><stop offset=".8" stop-color="#cf6a25"/><stop offset="1" stop-color="#a84f1a"/></radialGradient>
 <linearGradient id="rpBodyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c85a32"/><stop offset=".55" stop-color="#a8432a"/><stop offset="1" stop-color="#5c2418"/></linearGradient>
 <radialGradient id="rpHeadG" cx="50%" cy="40%" r="62%"><stop offset="0" stop-color="#d06a3c"/><stop offset=".85" stop-color="#b44e2b"/><stop offset="1" stop-color="#8c3820"/></radialGradient>
+<linearGradient id="tigBodyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f09a3e"/><stop offset=".6" stop-color="#d9741f"/><stop offset="1" stop-color="#a85414"/></linearGradient>
+<radialGradient id="tigHeadG" cx="50%" cy="42%" r="62%"><stop offset="0" stop-color="#f6aa52"/><stop offset=".8" stop-color="#df7a24"/><stop offset="1" stop-color="#b65c18"/></radialGradient>
+<linearGradient id="rockG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3a593"/><stop offset=".55" stop-color="#8d8070"/><stop offset="1" stop-color="#5f564b"/></linearGradient>
 <linearGradient id="cushG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d9aa6"/><stop offset="1" stop-color="#46616d"/></linearGradient>
 <linearGradient id="bedG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a39a8e"/><stop offset="1" stop-color="#6e665c"/></linearGradient>
 <linearGradient id="mossG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c8f45"/><stop offset="1" stop-color="#47552a"/></linearGradient>
@@ -482,7 +485,7 @@ function render() {
       ? state.next.map(n => `<div class="next-row"><span>${esc(n.title)}</span><span>${esc(when(n.at))}</span></div>`).join('')
       : `<div class="b-note">Nothing scheduled. Want to add something?</div>`;
     if (!setHTML(`
-      <div class="b-head"><span>Hi! I'm ${esc(name())} ${({ otter: '🦦', cat: '🐱', dog: '🐶', fox: '🦊' })[(state.settings && state.settings.animal) || 'otter'] || '🐾'}</span><button class="b-close" title="Close">×</button></div>
+      <div class="b-head"><span>Hi! I'm ${esc(name())} ${({ otter: '🦦', cat: '🐱', dog: '🐶', fox: '🦊', tiger: '🐯' })[(state.settings && state.settings.animal) || 'otter'] || '🐾'}</span><button class="b-close" title="Close">×</button></div>
       <div class="b-small" style="margin:2px 0 6px">Coming up</div>
       ${rows}
       ${state.todos ? `<div class="b-small" style="margin-top:6px">${state.todos} open to-do${state.todos > 1 ? 's' : ''}</div>` : ''}
@@ -553,7 +556,9 @@ function noise(start, dur, vol, filt, am) {
 const CLIPS = { otter: { pet: ['otter-pet'], happy: ['otter-happy'], call: ['otter-call'] },
   cat: { pet: ['cat-pet'], happy: ['cat-happy', 'cat-happy2'], call: ['cat-call'] },
   dog: { pet: ['dog-pet'], happy: ['dog-happy'], call: ['dog-call', 'dog-call2'] },
-  fox: { pet: ['fox-pet'], happy: ['fox-happy'], call: ['fox-call'] } };
+  fox: { pet: ['fox-pet'], happy: ['fox-happy'], call: ['fox-call'] },
+  tiger: { call: ['tiger-call', 'tiger-call2'] } };          // the tiger's friendly chuffs are built below
+const ANIMAL_LOUD = { tiger: .72 };                         // a small roar, not a scary one
 const LOUD = { pet: .55, happy: .8, call: .95 };
 const clipBufs = {}, clipLoading = {};
 function loadClips(animal) {
@@ -574,13 +579,34 @@ function playClip(name, vol) {
 }
 function voice(kind) {
   const s = state.settings || {}; if (s.voices === false || !audio()) return;
-  const a = s.animal || 'otter', set = CLIPS[a];
-  if (set) {
-    const names = set[kind] || set.happy, name = names[Math.floor(Math.random() * names.length)];
-    if (!playClip(name, LOUD[kind] || .8)) { loadClips(a); const p = clipLoading[name]; if (p) p.then(() => playClip(name, LOUD[kind] || .8)); }
+  const a = s.animal || 'otter', set = CLIPS[a], names = set && (set[kind] || (a !== 'tiger' && set.happy));
+  if (names) {
+    const name = names[Math.floor(Math.random() * names.length)], vol = (LOUD[kind] || .8) * (ANIMAL_LOUD[a] || 1);
+    if (!playClip(name, vol)) { loadClips(a); const p = clipLoading[name]; if (p) p.then(() => playClip(name, vol)); }
     return;
   }
-  try { redPanda(kind, ctx.currentTime + .02); } catch (_) {}
+  try { (a === 'tiger' ? tigerChuff : redPanda)(kind, ctx.currentTime + .02); } catch (_) {}
+}
+// tiger "chuff" (prusten): the friendly greeting tigers make, a few quick, fluttery puffs of air through the nose
+function chuffPuff(t, dur, vol) {
+  const len = Math.floor(ctx.sampleRate * dur), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 480 + Math.random() * 120; bp.Q.value = .8;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500;
+  const env = ctx.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(vol, t + .018); env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const flutter = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain();   // the lips/nostrils flutter ~30 times a second
+  flutter.gain.value = .55; lfo.frequency.value = 26 + Math.random() * 8; depth.gain.value = .45; lfo.connect(depth).connect(flutter.gain);
+  src.connect(bp).connect(lp).connect(env).connect(flutter).connect(master);
+  const v = ctx.createOscillator(), vg = ctx.createGain(), vl = ctx.createBiquadFilter();          // a little voice underneath
+  v.type = 'sawtooth'; v.frequency.setValueAtTime(118, t); v.frequency.exponentialRampToValueAtTime(92, t + dur); vl.type = 'lowpass'; vl.frequency.value = 520;
+  vg.gain.setValueAtTime(0.0001, t); vg.gain.exponentialRampToValueAtTime(vol * .28, t + .025); vg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  v.connect(vl).connect(vg).connect(flutter);
+  src.start(t); src.stop(t + dur + .02); lfo.start(t); lfo.stop(t + dur + .02); v.start(t); v.stop(t + dur + .02);
+}
+function tigerChuff(kind, t) {
+  const n = kind === 'pet' ? 2 : 3, vol = kind === 'pet' ? .22 : .3;
+  for (let i = 0; i < n; i++) chuffPuff(t + i * (.17 + Math.random() * .04), .13 + Math.random() * .03, vol * (1 - i * .15));
 }
 // red panda: breathy "huff", nasal "quack", and a soft twitter of short rising squeaks
 function rpTwitter(t, n, vol) {
@@ -807,7 +833,7 @@ wrap.addEventListener('mousemove', (e) => {
 wrap.addEventListener('mouseleave', () => { lastX = null; strokes = []; });
 
 // treats
-function treatEmoji() { return ({ otter: '🐟', cat: '🐟', dog: '🦴', fox: '🫐', redpanda: '🫐' })[(state.settings && state.settings.animal) || 'otter'] || '🍪'; }
+function treatEmoji() { return ({ otter: '🐟', cat: '🐟', dog: '🦴', fox: '🫐', redpanda: '🫐', tiger: '🍖' })[(state.settings && state.settings.animal) || 'otter'] || '🍪'; }
 function headPoint() {
   const h = (parts.head || wrap).getBoundingClientRect();
   return { x: h.left + h.width * .5, y: h.top + h.height * .72 };
