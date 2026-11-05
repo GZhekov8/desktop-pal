@@ -1,6 +1,7 @@
-# Builds the Windows installer on a real Windows machine and publishes it as a GitHub release.
+# Builds the Windows installer on a real Windows machine and the Mac apps (Apple chip + Intel) on a real Mac,
+# and publishes them all in one GitHub release.
 # Run it from the Actions tab ("Run workflow"), or by pushing a tag like v1.3.0.
-# The release includes latest.yml, which is what Desktop Pal's built-in updater checks.
+# The release includes latest.yml / latest-mac.yml, which is what Desktop Pal's built-in updater checks.
 name: Build & release
 
 on:
@@ -44,3 +45,43 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --win --x64 --publish always
+
+  mac:
+    needs: windows          # one job at a time, so both add their files to the same release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the game-check helper (Apple chip + Intel in one file)
+        run: |
+          swiftc -O -target arm64-apple-macos11 native/gamecheck.swift -o native/gc-arm64
+          swiftc -O -target x86_64-apple-macos11 native/gamecheck.swift -o native/gc-x64
+          lipo -create native/gc-arm64 native/gc-x64 -output native/gamecheck-mac
+          codesign --force -s - native/gamecheck-mac
+          lipo -info native/gamecheck-mac
+      - name: Launch test on a real Mac
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          npm i --no-save playwright@1.63.0
+          node tools/smoke.js native/gamecheck-mac
+      - name: Keep the launch-test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-screenshots
+          path: smoke/
+          if-no-files-found: ignore
+      - name: Point the app at this repository (update check)
+        run: |
+          npm pkg set repository.url=https://github.com/${{ github.repository }}
+          npm pkg set homepage=https://github.com/${{ github.repository }}/releases
+      - name: Build the Mac apps (.dmg + .zip, Apple chip and Intel) and add them to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --mac --arm64 --x64 --publish always
