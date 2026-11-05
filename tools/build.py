@@ -71,12 +71,12 @@ for name, parts in art.items():
 css = '''
   /* ---------- choice of animal ---------- */
   .animal { display: none; }
-  .pet-otter .a-otter, .pet-cat .a-cat, .pet-dog .a-dog, .pet-fox .a-fox, .pet-redpanda .a-redpanda { display: inline; }
-  .pet-cat, .pet-fox { --brow: #8f4515; } .pet-dog { --brow: #6e4420; } .pet-redpanda { --brow: #5a2214; }
-  .alert.pet-cat .float, .alert.pet-dog .float, .alert.pet-fox .float, .alert.pet-redpanda .float { animation: bounce 1.1s ease-in-out infinite; }
+  .pet-otter .a-otter, .pet-cat .a-cat, .pet-dog .a-dog, .pet-fox .a-fox, .pet-redpanda .a-redpanda, .pet-tiger .a-tiger { display: inline; }
+  .pet-cat, .pet-fox { --brow: #8f4515; } .pet-dog { --brow: #6e4420; } .pet-redpanda { --brow: #5a2214; } .pet-tiger { --brow: #2a1a10; }
+  .alert.pet-cat .float, .alert.pet-dog .float, .alert.pet-fox .float, .alert.pet-redpanda .float, .alert.pet-tiger .float { animation: bounce 1.1s ease-in-out infinite; }
   .alert-tail { transform-box: view-box; }
   .alert .alert-tail { animation: wag .35s ease-in-out infinite alternate; }
-  .pet-cat.alert .alert-tail, .pet-fox.alert .alert-tail { animation: wag 1s ease-in-out infinite alternate; }
+  .pet-cat.alert .alert-tail, .pet-fox.alert .alert-tail, .pet-tiger.alert .alert-tail { animation: wag 1s ease-in-out infinite alternate; }
   @keyframes wag { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
   .iris { transition: opacity .25s; }
   .m-happy .iris, .m-love .iris, .m-proud .iris, .m-sleepy .iris { opacity: 0; }

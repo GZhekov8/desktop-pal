@@ -150,7 +150,7 @@ async function petClick(pet) { // real mouse click on the pet (not a drag)
 
   // ---------- settings: animal, name, size
   await mgr2.click('.tab[data-tab="set"]');
-  for (const a of ['cat', 'dog', 'fox', 'redpanda', 'otter']) {
+  for (const a of ['cat', 'dog', 'fox', 'redpanda', 'tiger', 'otter']) {
     await mgr2.selectOption('#s-animal', a);
     ok(`switching animal to ${a}`, !!(await until(() => pet.locator(`#stage.pet-${a}`).count(), 4000)));
     const shown = await pet.evaluate((a) => getComputedStyle(document.querySelector('.float .a-' + a)).display !== 'none', a);

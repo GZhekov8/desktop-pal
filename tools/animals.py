@@ -1,4 +1,4 @@
-"""Generates the extra pets (cat, dog, fox, red panda) as SVG fragments.
+"""Generates the extra pets (cat, dog, fox, red panda, tiger cub) as SVG fragments.
 Every pet uses the same head-local face coordinates as the otter
 (eyes at x=+-11,y=-5; nose ends ~y=7; mouth below) so the shared
 expression parts fit all of them."""
@@ -88,6 +88,9 @@ DEFS = '''
 <radialGradient id="foxHeadG" cx="50%" cy="35%" r="62%"><stop offset="0" stop-color="#ec9145"/><stop offset=".8" stop-color="#cf6a25"/><stop offset="1" stop-color="#a84f1a"/></radialGradient>
 <linearGradient id="rpBodyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c85a32"/><stop offset=".55" stop-color="#a8432a"/><stop offset="1" stop-color="#5c2418"/></linearGradient>
 <radialGradient id="rpHeadG" cx="50%" cy="40%" r="62%"><stop offset="0" stop-color="#d06a3c"/><stop offset=".85" stop-color="#b44e2b"/><stop offset="1" stop-color="#8c3820"/></radialGradient>
+<linearGradient id="tigBodyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f09a3e"/><stop offset=".6" stop-color="#d9741f"/><stop offset="1" stop-color="#a85414"/></linearGradient>
+<radialGradient id="tigHeadG" cx="50%" cy="42%" r="62%"><stop offset="0" stop-color="#f6aa52"/><stop offset=".8" stop-color="#df7a24"/><stop offset="1" stop-color="#b65c18"/></radialGradient>
+<linearGradient id="rockG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3a593"/><stop offset=".55" stop-color="#8d8070"/><stop offset="1" stop-color="#5f564b"/></linearGradient>
 <linearGradient id="cushG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d9aa6"/><stop offset="1" stop-color="#46616d"/></linearGradient>
 <linearGradient id="bedG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a39a8e"/><stop offset="1" stop-color="#6e665c"/></linearGradient>
 <linearGradient id="mossG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c8f45"/><stop offset="1" stop-color="#47552a"/></linearGradient>
@@ -358,7 +361,90 @@ def redpanda():
       </g>'''
     return back, head, ''
 
-ANIMALS = {'cat': cat, 'dog': dog, 'fox': fox, 'redpanda': redpanda}
+
+# ================================================================ TIGER (young)
+def tiger():
+    random.seed(64)
+    body = 'M62 130 C54 110 66 90 96 84 C128 78 162 81 182 92 C196 100 199 118 193 132 C160 139 96 139 62 130 Z'
+    tail = 'M66 126 C74 141 116 145 156 141 C166 140 175 137 180 132 C172 134 160 135 150 135 C116 137 86 134 74 121 Z'
+    st = Strands()
+    def stripe_at(x, y):  # bold, slightly wavy vertical stripes like a real tiger
+        return math.sin((x + 3 * math.sin(y / 7)) / 4.2) > .62 and y < 128
+    def bcol(x, y):
+        if y > 127: return '#f6ead8'
+        base = hexmix('#f3a24a', '#a95515', q((y - 82) / 50))
+        return '#2b1a10' if stripe_at(x, y) else base
+    fill_strands(st, body, 1900, bcol, lambda x, y: math.pi + .2, (2.2, 4.2))
+    edge_strands(st, body, lambda x, y: '#f0a048', skip=lambda x, y: y > 126)
+    tst = Strands()
+    fill_strands(tst, tail, 460, lambda x, y: '#24150c' if math.sin(x / 4.6) > .45 or x > 170 else '#e98a32', lambda x, y: 0.05, (2, 3.6))
+    edge_strands(tst, tail, lambda x, y: '#e08530', step=3)
+    stripes = ''.join(f'<path d="M{x} {86 - (x - 120) * .02:.0f} C{x - 5} {96 + (x % 3)} {x + 2} {108} {x - 4} {121 - (x % 4)}" stroke="#1f120a" stroke-width="{3.6 if x % 2 else 2.8}" stroke-linecap="round" stroke-opacity=".72" fill="none" filter="url(#soft1)"/>'
+                      for x in range(80, 186, 11))
+    def hcol(x, y, rr):
+        if y > 3 and abs(x) < 12: return '#fbf3e8'                                   # white muzzle and chin
+        if abs(abs(x) - 16) < 6 and 0 < y < 12: return '#f8eee2'                       # white cheeks
+        if abs(abs(x) - 10) < 3.5 and -13 < y < -9: return '#fbf3e8'                   # white "eyebrow" spots
+        if y < -9 and abs(x) < 10 and int((x + 10) / 3.4) % 2 == 0: return '#24150c'  # forehead marks
+        if rr > .72 and abs(x) > 15 and int((y + 20) / 4) % 2 == 0: return '#2a1a10'   # cheek stripes
+        return hexmix('#f8ae58', '#c0651c', q(max(0, rr - .45) * 1.8))
+    head = f"""
+      <g class="animal a-tiger">
+        <ellipse cx="128" cy="135" rx="74" ry="6" fill="#2a2018" opacity=".35" filter="url(#soft)"/>
+        <path d="{body}" fill="url(#tigBodyG)" filter="url(#fur)"/>
+        {stripes}
+        {st.svg()}
+        <path d="M70 128 C100 134 160 134 190 128 C186 134 170 137 128 137 C96 137 78 134 70 128 Z" fill="#f6ead8" opacity=".9" filter="url(#soft1)"/>
+        <path d="M72 102 C88 88 122 82 162 84" stroke="#ffe2b8" stroke-opacity=".3" stroke-width="2" fill="none" filter="url(#soft1)"/>
+        <g class="alert-tail" style="transform-origin:68px 126px">
+          <path d="{tail}" fill="#e2802c" filter="url(#fur)"/>{tst.svg()}
+        </g>
+        <!-- big front paws -->
+        <g fill="#f8ecdc" filter="url(#fur)"><ellipse cx="173" cy="134" rx="11" ry="5.4"/><ellipse cx="193" cy="133" rx="10.5" ry="5.2"/></g>
+        <g stroke="#b8936c" stroke-width=".7" stroke-linecap="round"><path d="M170 136.4 v-2.6 M173.5 136.8 v-2.8 M177 136.4 v-2.6 M190 135.6 v-2.6 M193.5 136 v-2.8 M197 135.6 v-2.6"/></g>
+        <g transform="translate(196 81) rotate(4)">
+          <ellipse cx="-6" cy="20" rx="22" ry="5" fill="#3a1f0c" opacity=".3" filter="url(#soft)"/>
+          <!-- round ears: dark backs, pale fluffy insides -->
+          <circle cx="-20" cy="-17" r="8.6" fill="#23150c" filter="url(#fur)"/><circle cx="20" cy="-17" r="8.6" fill="#23150c" filter="url(#fur)"/>
+          <circle cx="-19.4" cy="-16" r="6.4" fill="#e5822c"/><circle cx="19.4" cy="-16" r="6.4" fill="#e5822c"/>
+          <circle cx="-18.6" cy="-14.6" r="4.2" fill="#f6e6d4" filter="url(#fur)"/><circle cx="18.6" cy="-14.6" r="4.2" fill="#f6e6d4" filter="url(#fur)"/>
+          <path d="M-28 4 C-29 -10 -17 -20 0 -20 C17 -20 29 -10 28 4 C27 14 15 22 0 22 C-15 22 -27 14 -28 4 Z" fill="url(#tigHeadG)" filter="url(#grizzle)"/>
+          {head_strands(hcol, n=850, rx=27, ry=20, cy=1)}
+          <!-- face markings -->
+          <g fill="#fbf3e8" filter="url(#soft1)"><ellipse cx="-10" cy="-11.5" rx="3.6" ry="2.2"/><ellipse cx="10" cy="-11.5" rx="3.6" ry="2.2"/></g>
+          <g stroke="#1f120a" stroke-width="1.9" stroke-linecap="round" fill="none" opacity=".85">
+            <path d="M0 -19.5 L0 -13 M-4.5 -18.5 L-3.2 -13.5 M4.5 -18.5 L3.2 -13.5 M-8 -17 L-6 -14 M8 -17 L6 -14"/>
+            <path d="M-18 -6 C-22 -5 -25 -3 -27 0 M18 -6 C22 -5 25 -3 27 0"/><path d="M-19 2 C-22 4 -24 7 -25 10 M19 2 C22 4 24 7 25 10"/>
+            <path d="M-21 -1 C-24 0 -26 2 -27.5 4.5 M21 -1 C24 0 26 2 27.5 4.5"/>
+          </g>
+          <!-- white fluffy cheeks and muzzle -->
+          <ellipse cx="-17" cy="8" rx="9" ry="7" fill="#f8eee2" filter="url(#fur)"/><ellipse cx="17" cy="8" rx="9" ry="7" fill="#f8eee2" filter="url(#fur)"/>
+          <ellipse cx="-5.2" cy="9.4" rx="6.6" ry="5" fill="#fdf6ec" filter="url(#soft1)"/><ellipse cx="5.2" cy="9.4" rx="6.6" ry="5" fill="#fdf6ec" filter="url(#soft1)"/>
+          <ellipse cx="0" cy="15.6" rx="6.6" ry="3.8" fill="#fdf6ec" filter="url(#soft1)"/>
+          <g fill="#a68466" opacity=".55"><circle cx="-6.5" cy="8.6" r=".55"/><circle cx="-8.8" cy="10.4" r=".55"/><circle cx="-5" cy="11" r=".55"/><circle cx="6.5" cy="8.6" r=".55"/><circle cx="8.8" cy="10.4" r=".55"/><circle cx="5" cy="11" r=".55"/></g>
+          <!-- amber irises (behind the shared pupils) -->
+          <g class="iris"><circle cx="-11" cy="-5" r="4.2" fill="#e0a83a"/><circle cx="11" cy="-5" r="4.2" fill="#e0a83a"/><circle cx="-11" cy="-5" r="4.2" fill="none" stroke="#8a5a16" stroke-width=".8"/><circle cx="11" cy="-5" r="4.2" fill="none" stroke="#8a5a16" stroke-width=".8"/></g>
+          <!-- dark eye lining that tigers have -->
+          <path d="M-16.5 -3.5 C-15 -1 -12 0 -8.5 -1.5 M16.5 -3.5 C15 -1 12 0 8.5 -1.5" stroke="#2a1a10" stroke-width=".9" fill="none" opacity=".6"/>
+          <path d="M-4 3 C-4 1.2 4 1.2 4 3 L0.7 7 C0.35 7.4 -0.35 7.4 -0.7 7 Z" fill="#e0918a" stroke="#a5605d" stroke-width=".45"/>
+          @@FACE@@
+          <g stroke="#fffaf2" stroke-width=".42" stroke-linecap="round" fill="none" opacity=".9">
+            <path d="M-9 9 C-18 7 -28 7 -36 9"/><path d="M-9 10.5 C-18 10.5 -28 12 -35 15"/><path d="M-9 12 C-17 13.5 -26 17 -32 21"/>
+            <path d="M9 9 C18 7 28 7 36 9"/><path d="M9 10.5 C18 10.5 28 12 35 15"/><path d="M9 12 C17 13.5 26 17 32 21"/>
+          </g>
+        </g>
+      </g>"""
+    back = """
+      <g class="animal a-tiger">
+        <path d="M14 140 C18 124 50 116 96 115 C150 114 206 118 228 128 C236 133 234 142 224 146 C170 152 70 152 22 147 C14 146 12 143 14 140 Z" fill="url(#rockG)"/>
+        <path d="M30 124 C70 118 160 117 214 124" stroke="#d6cbbc" stroke-width="1.6" stroke-opacity=".55" fill="none" filter="url(#soft1)"/>
+        <g stroke="#4f473e" stroke-width=".8" fill="none" opacity=".5" stroke-linecap="round"><path d="M60 138 C70 134 84 133 92 136"/><path d="M150 140 C162 137 178 137 188 140"/></g>
+        <g fill="#6f8a3a"><path d="M8 146 c2 -10 4 -16 6 -20 c0 6 0 12 -2 20z M16 146 c1 -8 4 -13 7 -16 c-2 6 -3 11 -3 16z M226 146 c1 -9 3 -14 6 -18 c-1 6 -1 12 -2 18z M233 146 c2 -7 5 -11 8 -13 c-3 5 -4 9 -4 13z"/></g>
+        <path d="M200 118 c8 -6 18 -7 26 -4 c-6 5 -16 7 -26 4z" fill="#5f7a32" opacity=".9"/>
+      </g>"""
+    return back, head, ''
+
+ANIMALS = {'cat': cat, 'dog': dog, 'fox': fox, 'redpanda': redpanda, 'tiger': tiger}
 
 # ---------------------------------------------------------------- neck / chest joining head to body
 NECKS = {
@@ -366,6 +452,7 @@ NECKS = {
     'dog': ('url(#dogBodyG)', lambda x, y: '#f2e6d2' if x > 186 and y > 96 else hexmix('#d8a05c', '#a06a34', q((y - 86) / 40))),
     'fox': ('#f2e8dc', lambda x, y: '#f7f0e6' if x > 184 else hexmix('#ec8a42', '#b0541b', q((y - 86) / 40))),
     'redpanda': ('url(#rpBodyG)', lambda x, y: '#3a1810' if x > 186 and y > 100 else hexmix('#d0643a', '#6a2a18', q((y - 86) / 36))),
+    'tiger': ('url(#tigBodyG)', lambda x, y: '#f8eee2' if x > 190 and y > 98 else ('#24150c' if math.sin(y / 3.4) > .7 and x < 186 else hexmix('#f3a24a', '#c0651c', q((y - 86) / 40)))),
 }
 def neck(name):
     random.seed(99)
@@ -407,6 +494,13 @@ WALKERS = {
                 neck='M156 98 C158 82 170 66 186 62 C199 59 206 72 201 86 C195 100 176 108 160 106 Z',
                 col=lambda x, y: ('#3a1810' if y > 108 else hexmix('#d0643a', '#7a2a18', q((y - 74) / 40))),
                 tcol=lambda x, y: '#e7a06a' if int(x / 7) % 2 else '#a63d22', head=(0, -22)),
+    'tiger': dict(body='M56 96 C58 79 82 72 110 72 C140 72 166 75 181 85 C192 94 191 111 179 118 C150 124 92 124 67 118 C55 114 53 105 56 96 Z',
+                fill='url(#tigBodyG)', leg='#e2802c', farleg='#c06a22', paw='#f3dfc4', legLen=38, hipY=109, pawR=7.6,
+                hips=(76, 90, 160, 172), tail='M62 90 C44 94 30 106 24 122 C21 131 25 138 32 134 C34 122 44 106 64 99 Z', tailFill='#e2802c',
+                extra=''.join(f'<path d="M{x} {74 + abs(x - 120) * .02:.0f} C{x - 4} 86 {x + 3} 98 {x - 2} {112 - (x % 3)}" stroke="#1f120a" stroke-width="{3.4 if x % 2 else 2.6}" stroke-linecap="round" stroke-opacity=".7" fill="none" filter="url(#soft1)"/>' for x in range(70, 176, 11)),
+                neck='M156 98 C158 82 170 66 186 62 C199 59 206 72 201 86 C195 100 176 108 160 106 Z',
+                col=lambda x, y: ('#f8eee2' if y > 112 or (x > 162 and y > 96) else '#22140b' if math.sin((x + 3 * math.sin(y / 7)) / 4.2) > .62 else hexmix('#f3a24a', '#b05816', q((y - 72) / 48))),
+                tcol=lambda x, y: '#24150c' if math.sin((x + y) / 4.2) > .45 or y > 128 else '#e98a32', head=(0, -22)),
     'otter': dict(body='M40 112 C44 98 70 92 110 92 C150 92 176 96 186 106 C192 116 186 126 170 128 C130 132 80 132 52 126 C42 122 38 118 40 112 Z',
                 fill='url(#bodyG)', leg='#3b2318', farleg='#2a1810', paw='#2b1810', legLen=22, hipY=124,
                 hips=(66, 80, 156, 168), tail='M44 114 C30 114 14 118 4 125 C12 130 30 130 46 123 Z', tailFill='#4a2c1c',
@@ -432,14 +526,14 @@ def walker(name):
                 f'<path d="M-9 -6 C-9.5 {U*.5:.0f} -6.5 {U-1} -5.5 {U+2} L5.5 {U+2} C6.5 {U-1} 9 {U*.5:.0f} 8.5 -6 Z" fill="{color}" filter="url(#fur)"/>'
                 f'<g transform="translate(0 {U})"><g class="shin">'
                 f'<path d="M-5.6 -3 C-6 {D*.5:.0f} -4.6 {D*.9:.0f} -4 {D} L4 {D} C4.6 {D*.9:.0f} 6 {D*.5:.0f} 5.6 -3 Z" fill="{color}" filter="url(#fur)"/>'
-                f'<ellipse cx="1.5" cy="{D+1}" rx="6" ry="3.2" fill="{paw}"/></g></g></g></g>')
+                f'<ellipse cx="1.5" cy="{D+1}" rx="{w.get("pawR", 6)}" ry="{w.get("pawR", 6) * .53:.1f}" fill="{paw}"/></g></g></g></g>')
     b1, b2, f1, f2 = w['hips']
     ground = w['hipY'] + L + 2
     return (f'<g class="walker">'
             f'<ellipse class="wshadow" cx="118" cy="{ground}" rx="72" ry="4.5" fill="#000" opacity=".22" filter="url(#soft)"/>'
             f'<g class="wmove"><g class="wtail"><path d="{w["tail"]}" fill="{w["tailFill"]}" filter="url(#fur)"/>{tst.svg()}</g>'
             + leg(b2, w['farleg'], 3.14, True, False) + leg(f2, w['farleg'], 0, True, True) +
-            f'<g class="wbody"><path d="{w["body"]}" fill="{w["fill"]}" filter="url(#fur)"/>{st.svg()}'
+            f'<g class="wbody"><path d="{w["body"]}" fill="{w["fill"]}" filter="url(#fur)"/>{w.get("extra", "")}{st.svg()}'
             f'<path d="{w.get("shine", "M70 86 C90 76 130 72 168 80")}" stroke="#ffe6c8" stroke-opacity=".25" stroke-width="2" fill="none" filter="url(#soft1)"/></g>'
             + leg(b1, w['leg'], 0, False, False) + leg(f1, w['leg'], 3.14, False, True) +
             f'<g class="wfront"><path d="{w["neck"]}" fill="{w["fill"]}" filter="url(#fur)"/>{nst.svg()}'

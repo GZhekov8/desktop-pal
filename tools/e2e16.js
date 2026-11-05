@@ -103,7 +103,7 @@ const bounds = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAll
   await app.close();
 
   // ---------------- every animal can walk ----------------
-  for (const a of ['cat', 'dog', 'fox', 'redpanda']) {
+  for (const a of ['cat', 'dog', 'fox', 'redpanda', 'tiger']) {
     ({ app, pet, errors } = await launch({ animal: a, walk: 'often' }, { DP_WALK_SCALE: '60' }));
     await pet.evaluate(() => window.otter.done('r1')).catch(() => {});
     const h = await bounds(app);
@@ -122,12 +122,13 @@ const bounds = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAll
   await pet.evaluate(() => window.otter.settings({ quietOn: false, voices: true, volume: 80 }));
   await sleep(600);
   ok('voices play without errors for every animal', await pet.evaluate(async () => {
-    for (const a of ['otter', 'cat', 'dog', 'fox', 'redpanda']) { state.settings.animal = a; for (const k of ['pet', 'happy', 'call']) voice(k); }
+    for (const a of ['otter', 'cat', 'dog', 'fox', 'redpanda', 'tiger']) { state.settings.animal = a; for (const k of ['pet', 'happy', 'call']) voice(k); }
     munch(); chime(); return true; }));
   ok('recorded voices load and decode for every animal', !!(await until(() => pet.evaluate(() => {
-    for (const a of ['otter', 'cat', 'dog', 'fox']) loadClips(a);
-    return Object.keys(clipBufs).length === 14 && Object.values(clipBufs).every(b => b.duration > .2 && b.duration < 2);
+    for (const a of ['otter', 'cat', 'dog', 'fox', 'tiger']) loadClips(a);
+    return Object.keys(clipBufs).length === 16 && Object.values(clipBufs).every(b => b.duration > .2 && b.duration < 2);
   }), 8000)), await pet.evaluate(() => Object.keys(clipBufs).length + ' clips'));
+  ok('tiger: roar is recorded, chuffs are built (no errors)', await pet.evaluate(() => { state.settings.animal = 'tiger'; voice('call'); voice('pet'); voice('happy'); tigerChuff('happy', ctx.currentTime + .05); return !!clipBufs['tiger-call'] && !!clipBufs['tiger-call2']; }));
   ok('recorded voice actually plays', await pet.evaluate(() => { state.settings.animal = 'cat'; return playClip('cat-call', .5); }));
   ok('no page errors (sounds)', errors.length === 0, errors.slice(0, 2).join(' | '));
   await app.close();
