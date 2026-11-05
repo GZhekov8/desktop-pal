@@ -47,6 +47,9 @@ function restartSelf() {
   app.relaunch({ args }); app.exit(0);
 }
 
+const PKG_EARLY = require('../package.json');
+const IS_MAC = process.platform === 'darwin';
+const RELEASES_URL = () => (PKG_EARLY.homepage || 'https://github.com/GZhekov8/desktop-pal/releases').replace(/\/releases.*$/, '') + '/releases/latest';
 const DATA_FILE = () => path.join(app.getPath('userData'), 'otterpal-data.json');
 // The pet window fits the pet (50-150%) plus a speech bubble whose text size is set separately (80-150%).
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -54,7 +57,10 @@ let preview = null;        // size/text size being previewed from Settings, not 
 function eff() { return preview ? { ...data.settings, ...preview } : data.settings; }
 function petDims(s = eff()) {
   const pet = clamp(Number(s.size) || 1, 0.5, 1.5), text = clamp(Number(s.textSize) || 1, 0.8, 1.5);
-  return { w: Math.ceil(Math.max(302 * text + 28, 246 * pet + 10)), h: Math.ceil(170 * pet + 12 + 300 * text) };
+  // The pet sits in the middle with equal room on both sides, so the speech bubble can open to the left
+  // (pet on the right half of the screen) or to the right (pet on the left half). Around the pet the window is see-through and clicks pass through.
+  const zone = Math.ceil(246 * pet + 10), extra = Math.max(0, Math.ceil(302 * text + 28 - zone));
+  return { w: zone + 2 * extra, h: Math.ceil(170 * pet + 12 + 300 * text), extra, petR: extra + 6, petW: 240 * pet };
 }
 
 let data = {
@@ -254,6 +260,7 @@ function updateCalm() {
 }
 
 function complete(id) {
+  if (id === 'update' && upd.status === 'available') { updDismissed = true; shell.openExternal(RELEASES_URL()); pushState(false); return; }
   if (id === 'update') { log('installing update', upd.version); if (updater) setImmediate(() => updater.quitAndInstall(true, true)); return; }
   if (id === 'preview') return applyPreview();
   if (id === 'focus-break' || id === 'focus-next') return startFocus();   // "Skip break" / "Start"
@@ -372,7 +379,11 @@ const NOT_GAMES = new Set(['chrome.exe', 'msedge.exe', 'firefox.exe', 'opera.exe
   'arc.exe', 'vlc.exe', 'mpc-hc.exe', 'mpc-hc64.exe', 'mpc-be.exe', 'mpc-be64.exe', 'potplayer.exe', 'potplayermini.exe', 'potplayermini64.exe',
   'wmplayer.exe', 'video.ui.exe', 'microsoft.media.player.exe', 'netflix.exe', 'spotify.exe', 'kodi.exe', 'plex.exe', 'powerpnt.exe',
   'explorer.exe', 'applicationframehost.exe', 'desktop pal.exe', 'electron.exe', 'lockapp.exe', 'searchhost.exe', 'shellexperiencehost.exe',
-  'startmenuexperiencehost.exe', 'obs64.exe', 'zoom.exe', 'teams.exe', 'ms-teams.exe', 'discord.exe']);
+  'startmenuexperiencehost.exe', 'obs64.exe', 'zoom.exe', 'teams.exe', 'ms-teams.exe', 'discord.exe',
+  // Mac names
+  'safari', 'google chrome', 'firefox', 'microsoft edge', 'arc', 'opera', 'brave browser', 'vivaldi', 'vlc', 'iina', 'quicktime player',
+  'tv', 'music', 'spotify', 'keynote', 'microsoft powerpoint', 'finder', 'zoom.us', 'slack', 'discord', 'desktop pal', 'electron', 'loginwindow', 'screensaverengine']);
+const PROBE_MAC = IS_MAC || process.env.DP_GAME_PROBE_MAC === '1';
 let gaming = false, gameSince = 0, gameExe = '', gameProc = null, gameRaw = false, gameRawTimer = null, peeking = false, peekTimer = null, welcomeUntil = 0, gameLoopT = null;
 function gameBreakMs() { return Math.max(0, Number(data.settings.gameBreakMin) || 0) * GMIN; }
 function playedText() {
@@ -381,8 +392,10 @@ function playedText() {
 }
 function treatEmojiFor() { return ({ otter: '🐟', cat: '🐟', dog: '🦴', fox: '🍇', redpanda: '🎋' })[data.settings.animal] || '🍪'; }
 function readProbe(line) {
-  const [q, full, exe = ''] = String(line).trim().split('|'); const e = exe.trim().toLowerCase();
-  const game = !!e && !NOT_GAMES.has(e) && q !== '4' && (q === '3' || full === '1');
+  const [q, full, exe = '', cat = ''] = String(line).trim().split('|'); const e = exe.trim().toLowerCase();
+  // Windows: any full-screen app except browsers/players. Mac: only apps the helper recognises as games (state 3).
+  const game = !!e && !NOT_GAMES.has(e) && q !== '4' && (PROBE_MAC ? q === '3' : (q === '3' || full === '1'));
+  if (cat && e !== gameExe) log('game check category', e, cat);
   if (e !== gameExe && (game || gaming)) log('game check', { q, full, exe: e, game });
   gameExe = game ? e : (gaming ? gameExe : '');
   setGameRaw(game);
@@ -399,9 +412,11 @@ function startGameProbe() {
     let last = ''; gameProc = { kill() { clearInterval(this.t); }, t: setInterval(() => { let l = ''; try { l = fs.readFileSync(test, 'utf8'); } catch (_) {} if (l !== last) { last = l; readProbe(l); } }, 300) };
     return;
   }
-  if (process.platform !== 'win32') return;
-  const exe = app.isPackaged ? path.join(process.resourcesPath, 'gamecheck.exe') : path.join(__dirname, '..', 'native', 'gamecheck.exe');
+  if (process.platform !== 'win32' && !IS_MAC) return;
+  const exe = IS_MAC ? (app.isPackaged ? path.join(process.resourcesPath, 'gamecheck') : path.join(__dirname, '..', 'native', 'gamecheck-mac'))
+    : (app.isPackaged ? path.join(process.resourcesPath, 'gamecheck.exe') : path.join(__dirname, '..', 'native', 'gamecheck.exe'));
   if (!fs.existsSync(exe)) { log('game check helper missing', exe); return; }
+  if (IS_MAC) try { fs.chmodSync(exe, 0o755); } catch (_) {}
   try {
     const p = require('child_process').spawn(exe, [], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
     gameProc = p; let buf = '';
@@ -488,6 +503,7 @@ function homePos() { return data.settings.pos || defaultPos(); }
 function setPose(p, dir) {
   walkPose = p; if (dir) walkDir = dir;
   if (pet && !pet.isDestroyed()) pet.webContents.send('pose', { pose: p, dir: walkDir });
+  if (p !== 'walk') pushState(false);      // the bubble side may have changed
 }
 function canWalk() {
   return pet && !pet.isDestroyed() && pet.isVisible() && calmSent === false && !queue.length && !dragStart && !preview &&
@@ -502,13 +518,17 @@ function scheduleWalk(ms) {
 }
 function tryWalk() {
   if (!canWalk()) return scheduleWalk();
-  const b = pet.getBounds(), wa = screen.getDisplayMatching(b).workArea, home = homePos();
-  const minX = wa.x, maxX = wa.x + wa.width - b.width;
+  const b = pet.getBounds(), wa = screen.getDisplayMatching(b).workArea, home = homePos(), d = petDims();
+  // the window is wider than the pet: limits are where the pet itself reaches the screen edges
+  const offL = b.width - d.petR - d.petW;
+  const minX = Math.round(wa.x - offL + 4), maxX = Math.round(wa.x + wa.width - b.width + d.petR - 4);
   const away = Math.abs(b.x - home.x) > 4;
   let target = home.x;
   if (!away || Math.random() > 0.45) {
+    const r = petRect(b, d), toMiddle = r.x + r.w / 2 < wa.x + wa.width / 2 ? 1 : -1;   // mostly stroll towards the middle of the screen
     for (let i = 0; i < 12; i++) {
-      const t = clamp(Math.round(home.x + (Math.random() * 2 - 1) * 520), minX, maxX);
+      const dir = Math.random() < 0.8 ? toMiddle : -toMiddle;
+      const t = clamp(Math.round(b.x + dir * (140 + Math.random() * 380)), minX, maxX);
       if (Math.abs(t - b.x) >= 120) { target = t; break; }
     }
   }
@@ -557,7 +577,7 @@ function walkHome() {
    Uses electron-updater. Active only in installed builds that were published with an update feed
    (GitHub releases later); otherwise it stays quietly off. */
 let updater = null, upd = { status: 'off', version: null, percent: 0 }, updDismissed = false;
-function setUpdate(o) { upd = { ...upd, ...o }; pushManager(); pushState(o.status === 'ready'); rebuildTray(); }
+function setUpdate(o) { const was = upd.status; upd = { ...upd, ...o }; pushManager(); pushState((o.status === 'ready' || o.status === 'available') && was !== o.status); rebuildTray(); }
 function setupUpdater() {
   const test = process.env.DP_TEST_UPDATES;            // url of a local feed, for testing only
   if ((!app.isPackaged && !test) || LEGACY_INSTALL) return;
@@ -568,13 +588,14 @@ function setupUpdater() {
     updater.autoDownload = true; updater.autoInstallOnAppQuit = true;
     updater.logger = { info: (x) => log('update', String(x)), warn: (x) => log('update warn', String(x)), error: (x) => log('update error', String(x)), debug: () => {} };
     updater.on('checking-for-update', () => setUpdate({ status: 'checking' }));
-    updater.on('update-available', (i) => setUpdate({ status: 'downloading', version: i.version, percent: 0 }));
+    if (IS_MAC) updater.autoDownload = false;   // unsigned Mac apps can't replace themselves: we point to the download page instead
+    updater.on('update-available', (i) => setUpdate(IS_MAC ? { status: 'available', version: i.version } : { status: 'downloading', version: i.version, percent: 0 }));
     updater.on('download-progress', (p) => setUpdate({ status: 'downloading', percent: Math.round(p.percent) }));
     updater.on('update-not-available', () => setUpdate({ status: 'latest' }));
     updater.on('update-downloaded', (i) => { updDismissed = false; setUpdate({ status: 'ready', version: i.version }); });
     updater.on('error', (e) => setUpdate({ status: /ENOENT|app-update\.yml|No published versions|404/i.test(String(e)) ? 'off' : 'error' }));
     setUpdate({ status: 'idle' });
-    const check = () => { if (upd.status !== 'downloading' && upd.status !== 'ready') updater.checkForUpdates().catch(() => {}); };
+    const check = () => { if (upd.status !== 'downloading' && upd.status !== 'ready' && upd.status !== 'available') updater.checkForUpdates().catch(() => {}); };
     setTimeout(check, test ? 1500 : 20000);
     setInterval(check, 6 * 3600 * 1000);
   } catch (e) { log('updater unavailable', String(e)); updater = null; }
@@ -601,13 +622,16 @@ function petState() {
       : (() => { const r = data.reminders.find(x => x.id === id); return r && { id, kind: r.type, title: r.title, note: r.note, mood: r.mood || 'auto', overdue: r.type === 'once' && r.at && new Date(r.at).getTime() < Date.now() - 5 * 60000 ? r.at : null }; })()
     ).filter(Boolean).map(it => it).concat(preview
       ? [{ id: 'preview', kind: 'preview', title: 'This is how reminders will look', note: `Pet size ${Math.round((eff().size || 1) * 100)}% · Text size ${Math.round((eff().textSize || 1) * 100)}%`, mood: 'happy', doneLabel: 'Apply', laterLabel: 'Cancel' }] : []).concat(upd.status === 'ready' && !updDismissed
-      ? [{ id: 'update', kind: 'update', title: `Version ${upd.version} is ready`, note: 'Restart Desktop Pal to finish updating. Your reminders stay as they are.' }] : []),
+      ? [{ id: 'update', kind: 'update', title: `Version ${upd.version} is ready`, note: 'Restart Desktop Pal to finish updating. Your reminders stay as they are.' }]
+      : upd.status === 'available' && !updDismissed
+      ? [{ id: 'update', kind: 'update', title: `Version ${upd.version} is out!`, note: 'Download it and drag it into Applications to replace this one. Your reminders stay as they are.', doneLabel: 'Download', laterLabel: 'Later' }] : []),
     next: upcoming().slice(0, 3).map(r => ({ title: r.title, at: r.nextAt })),
     todos: openTodos().length,
     settings: eff(),
     treats: data.treats || 0,
     focus: { state: data.focus.state, endsAt: data.focus.endsAt, round: data.focus.round, held: data.held.length, lens: focusLens() },
-    headset: peeking || welcomeUntil > Date.now()
+    headset: peeking || welcomeUntil > Date.now(),
+    side: petSide()
   };
 }
 let lastStateJson = '', stateSends = 0, stateSkips = 0;
@@ -630,24 +654,38 @@ function managerData() {
 function defaultPos() {
   const wa = screen.getPrimaryDisplay().workArea;
   const d = petDims();
-  return { x: wa.x + wa.width - d.w - 8, y: wa.y + wa.height - d.h };
+  return { x: wa.x + wa.width - 8 + d.petR - d.w, y: wa.y + wa.height - d.h };   // pet 8 px from the right edge
 }
+// where the pet itself is on screen (the window is wider than the pet)
+function petRect(b, d = petDims()) { return { x: b.x + b.width - d.petR - d.petW, y: b.y + b.height - 170 * clamp(Number(eff().size) || 1, 0.5, 1.5), w: d.petW, h: 170 * clamp(Number(eff().size) || 1, 0.5, 1.5) }; }
 function validPos(p) {
   if (!p) return false;
-  const { w, h } = petDims();
-  return screen.getAllDisplays().some(d => {
-    const a = d.workArea;
-    return p.x + w / 2 >= a.x && p.x + w / 2 <= a.x + a.width && p.y + h / 2 >= a.y && p.y + h / 2 <= a.y + a.height;
-  });
+  const d = petDims(), r = petRect({ x: p.x, y: p.y, width: d.w, height: d.h }, d), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  return screen.getAllDisplays().some(dd => { const a = dd.workArea; return cx >= a.x && cx <= a.x + a.width && cy >= a.y && cy <= a.y + a.height; });
+}
+// which half of its screen the pet is on: the bubble opens towards the middle of the screen
+function petSide() {
+  if (!pet || pet.isDestroyed()) return 'right';
+  const b = pet.getBounds(), r = petRect(b), wa = screen.getDisplayMatching(b).workArea;
+  return r.x + r.w / 2 < wa.x + wa.width / 2 ? 'left' : 'right';
+}
+// keep the whole pet on the screen it's on (after dragging or a screen change)
+function keepPetOnScreen() {
+  if (!pet || pet.isDestroyed()) return;
+  const b = pet.getBounds(), d = petDims(), r = petRect(b, d), wa = screen.getDisplayMatching(b).workArea;
+  const dx = r.x < wa.x ? wa.x - r.x : r.x + r.w > wa.x + wa.width ? wa.x + wa.width - r.x - r.w : 0;
+  const dy = r.y + r.h > wa.y + wa.height ? wa.y + wa.height - r.y - r.h : r.y < wa.y ? wa.y - r.y : 0;
+  if (dx || dy) pet.setPosition(Math.round(b.x + dx), Math.round(b.y + dy));
 }
 function createPet() {
+  curPetR = petDims().petR;
   // the window's size depends on settings: keep the pet's bottom-right corner where the user left it
   const dims = petDims();
-  if (data.settings.pos) {
-    data.settings.pos.x -= dims.w - (data.settings.petW || 340);
+  if (data.settings.pos) {     // keep the pet itself where it was (older versions had it at the window's right edge)
+    data.settings.pos.x += (data.settings.petW || 340) - (data.settings.petR != null ? data.settings.petR : 6) - (dims.w - dims.petR);
     data.settings.pos.y -= dims.h - (data.settings.petH || 400);
   }
-  data.settings.petW = dims.w; data.settings.petH = dims.h;
+  data.settings.petW = dims.w; data.settings.petH = dims.h; data.settings.petR = dims.petR;
   const p = validPos(data.settings.pos) ? data.settings.pos : defaultPos();
   pet = new BrowserWindow({
     x: p.x, y: p.y, width: dims.w, height: dims.h,
@@ -658,6 +696,7 @@ function createPet() {
   });
   pet.setAlwaysOnTop(true, 'screen-saver');
   pet.setIgnoreMouseEvents(true, { forward: true });
+  if (IS_MAC) pet.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });   // stays with you on every desktop (Space)
   pet.loadFile(path.join(__dirname, 'pet.html'));
   let shown = false;
   const reveal = (why) => {
@@ -672,14 +711,18 @@ function createPet() {
   pet.webContents.on('render-process-gone', (_e, d) => log('pet renderer gone', d));
   pet.webContents.on('console-message', (_e, level, msg) => { if (level >= 2) log('pet console', msg); });
 }
+let curPetR = null;
 function resizePet() {
   if (!pet || pet.isDestroyed()) return;
   const b = pet.getBounds(), d = petDims();
   if (b.width === d.w && b.height === d.h) return;
-  const x = b.x + b.width - d.w, y = b.y + b.height - d.h;   // keep the bottom-right corner in place
+  const oldR = curPetR != null ? curPetR : (data.settings.petR != null ? data.settings.petR : 6);
+  const x = b.x + b.width - oldR + d.petR - d.w, y = b.y + b.height - d.h;   // the pet keeps its bottom-right corner
   pet.setBounds({ x, y, width: d.w, height: d.h });
-  if (data.settings.pos && !preview) data.settings.pos = { x: data.settings.pos.x + b.width - d.w, y: data.settings.pos.y + b.height - d.h };
-  data.settings.petW = d.w; data.settings.petH = d.h;
+  curPetR = d.petR;
+  if (data.settings.pos && !preview) data.settings.pos = { x: data.settings.pos.x + x - b.x, y: data.settings.pos.y + y - b.y };
+  if (!preview) { data.settings.petW = d.w; data.settings.petH = d.h; data.settings.petR = d.petR; }
+  pushState(false);
 }
 function showPet() {
   if (!pet || pet.isDestroyed()) return;
@@ -698,6 +741,7 @@ function hidePet(mins) {
   updateCalm();
 }
 function openManager(tab) {
+  if (IS_MAC && app.dock) { app.dock.show(); app.focus({ steal: true }); }
   if (manager && !manager.isDestroyed()) { manager.show(); manager.focus(); if (tab) manager.webContents.send('tab', tab); return; }
   manager = new BrowserWindow({
     width: 760, height: 640, minWidth: 560, minHeight: 480,
@@ -706,7 +750,7 @@ function openManager(tab) {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
   });
   manager.loadFile(path.join(__dirname, 'manager.html'), { query: { tab: tab || '' } });
-  manager.on('closed', () => { manager = null; cancelPreview(); });
+  manager.on('closed', () => { manager = null; cancelPreview(); if (IS_MAC && app.dock) app.dock.hide(); });
 }
 
 /* ---------------- tray ---------------- */
@@ -734,6 +778,7 @@ function rebuildTray() {
     { label: 'Move back to corner', click: () => { data.settings.pos = null; const p = defaultPos(); pet.setPosition(p.x, p.y); save(); } },
     { type: 'separator' },
     ...(upd.status === 'ready' ? [{ label: `Restart to update to ${upd.version}`, click: () => complete('update') }] : []),
+    ...(upd.status === 'available' ? [{ label: `Download version ${upd.version}…`, click: () => shell.openExternal(RELEASES_URL()) }] : []),
     { label: `About Desktop Pal ${app.getVersion()}`, click: () => openManager('set') },
     { label: 'Quit Desktop Pal', click: () => { app.isQuitting = true; app.quit(); } }
   ]));
@@ -796,7 +841,7 @@ ipcMain.handle('mgr:walkNow', () => { if (canWalk()) tryWalk(); else scheduleWal
 let dragStart = null;
 ipcMain.on('pet:drag-start', () => { stopWalk(); dragStart = pet.getPosition(); });
 ipcMain.on('pet:drag', (_e, dx, dy) => { if (dragStart) pet.setPosition(Math.round(dragStart[0] + dx), Math.round(dragStart[1] + dy)); });
-ipcMain.on('pet:drag-end', () => { if (dragStart) { const [x, y] = pet.getPosition(); data.settings.pos = { x, y }; save(); } dragStart = null; });
+ipcMain.on('pet:drag-end', () => { if (dragStart) { keepPetOnScreen(); const [x, y] = pet.getPosition(); data.settings.pos = { x, y }; save(); pushState(false); } dragStart = null; });
 
 const ANIMALS = ['otter', 'cat', 'dog', 'fox', 'redpanda'];
 const artCache = new Map();
@@ -853,6 +898,7 @@ ipcMain.handle('mgr:about', () => ({ version: app.getVersion(), page: PKG.homepa
 ipcMain.handle('mgr:checkUpdate', async () => {
   if (!updater || upd.status === 'off') return upd;
   if (upd.status === 'ready') { complete('update'); return upd; }
+  if (upd.status === 'available') { shell.openExternal(RELEASES_URL()); return upd; }
   try { await updater.checkForUpdates(); } catch (_) {}
   return upd;
 });
@@ -894,10 +940,14 @@ app.whenReady().then(async () => {
     powerMonitor.on('suspend', () => { locked = true; updateCalm(); });
     powerMonitor.on('resume', () => { locked = false; updateCalm(); setTimeout(tick, 1000); });
   } catch (_) {}
-  log('start', app.getVersion(), process.versions.electron);
+  log('start', app.getVersion(), process.versions.electron, process.platform, process.arch);
+  if (IS_MAC) {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]));   // Cmd+C / Cmd+V / Cmd+W in the app window
+    if (app.dock) app.dock.hide();
+  }
   load();
   createPet();
-  const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'));
+  const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', IS_MAC ? 'trayTemplate.png' : 'tray.png'));   // Mac: black 'template' icon that follows the menu bar colours
   tray = new Tray(icon);
   tray.on('click', () => openManager());
   rebuildTray();
@@ -932,7 +982,8 @@ app.whenReady().then(async () => {
   } catch (e) { log('watch failed', String(e)); }
   setInterval(tick, 5000);
   setTimeout(tick, 1500);
-  screen.on('display-removed', () => { if (!validPos(pet.getBounds())) { const p = defaultPos(); pet.setPosition(p.x, p.y); } });
+  screen.on('display-removed', () => { if (!validPos(pet.getBounds())) { const p = defaultPos(); pet.setPosition(p.x, p.y); } pushState(false); });
+  screen.on('display-metrics-changed', () => setTimeout(() => { keepPetOnScreen(); pushState(false); }, 300));
   setupUpdater();
   if (data.focus.state === 'focus' || data.focus.state === 'break') scheduleFocus();
   else if (data.focus.state === 'ready' && !queue.includes('focus-next')) queue.unshift('focus-next');

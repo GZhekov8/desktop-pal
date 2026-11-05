@@ -10,15 +10,20 @@
   }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none;
     font-family: "Segoe UI", system-ui, sans-serif; }
-  .stage { position: absolute; right: 0; bottom: 0; width: 100%; height: 100%; --pet: 1; --text: 1; }
+  .stage { position: absolute; right: 0; bottom: 0; width: 100%; height: 100%; --pet: 1; --text: 1;
+    /* the pet sits in the middle of the window with this much room on each side for the bubble (matches petDims in main.js) */
+    --extra: max(0px, calc(302px * var(--text) + 28px - 246px * var(--pet) - 10px)); }
 
   /* ---------- speech bubble ---------- */
   /* the bubble has its own text size (--text) and always sits just above the pet (--pet) */
-  #bubble { position: absolute; zoom: var(--text); right: calc(18px / var(--text)); bottom: calc((170px * var(--pet) + 12px) / var(--text)); width: 270px; background: var(--paper); color: var(--ink);
+  #bubble { position: absolute; zoom: var(--text); right: calc((18px + var(--extra)) / var(--text)); bottom: calc((170px * var(--pet) + 12px) / var(--text)); width: 270px; background: var(--paper); color: var(--ink);
     border-radius: 16px; padding: 14px 16px 12px; box-shadow: 0 6px 22px rgba(30,20,10,.28), 0 0 0 1.5px rgba(90,55,30,.18);
     opacity: 0; transform: translateY(10px) scale(.96); transform-origin: 80% 100%; pointer-events: none;
     transition: opacity .22s ease, transform .22s ease; }
   #bubble.show { opacity: 1; transform: none; pointer-events: auto; }
+  /* pet on the left half of the screen: the bubble opens to its right, still pointing at the pet's head */
+  .side-left #bubble { right: auto; left: calc((18px + var(--extra)) / var(--text)); transform-origin: 20% 100%; }
+  .side-left #bubble::after { right: auto; left: clamp(26px, calc((196px * var(--pet) - 25px) / var(--text)), 250px); }
   #bubble::after { content: ""; position: absolute; right: calc(max(26px, 64px * var(--pet)) / var(--text)); bottom: -11px; width: 22px; height: 22px; background: var(--paper);
     transform: rotate(45deg); border-radius: 0 0 5px 0; box-shadow: 3px 3px 4px rgba(30,20,10,.12); }
   .b-head { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #8a6a52;
@@ -44,7 +49,7 @@
   .next-row span:last-child { color: #8a6a52; white-space: nowrap; }
 
   /* ---------- otter ---------- */
-  #otterWrap { position: absolute; right: 6px; bottom: 0; width: 240px; height: 170px; cursor: grab; transform: scale(var(--pet)); transform-origin: 100% 100%; }
+  #otterWrap { position: absolute; right: calc(6px + var(--extra)); bottom: 0; width: 240px; height: 170px; cursor: grab; transform: scale(var(--pet)); transform-origin: 100% 100%; }
   #otterWrap.dragging { cursor: grabbing; }
   .layer { position: absolute; inset: 0; width: 100%; height: 100%; }
   svg { width: 100%; height: 100%; overflow: visible; display: block; }
@@ -147,7 +152,7 @@
   .petting .head { rotate: 7deg; }
 
   /* ---------- focus countdown chip, treats ---------- */
-  #chip { position: absolute; zoom: var(--text); bottom: calc(4px / var(--text)); right: calc((240px * var(--pet) - 36px) / var(--text));
+  #chip { position: absolute; zoom: var(--text); bottom: calc(4px / var(--text)); right: calc((240px * var(--pet) - 36px + var(--extra)) / var(--text));
     background: rgba(255,253,248,.94); color: #5a3f2c; font: 600 11.5px "Segoe UI", system-ui, sans-serif; padding: 3px 9px; border-radius: 99px;
     box-shadow: 0 2px 8px rgba(30,20,10,.25); white-space: nowrap; display: none; pointer-events: none; font-variant-numeric: tabular-nums; }
   #chip.on { display: block; }
@@ -859,6 +864,7 @@ window.otter.onState((s) => {
   updateChip();
   if (s.settings && s.settings.voices !== false && s.settings.sound !== false && CLIPS[s.settings.animal || 'otter']) setTimeout(() => { if (ctx || audio()) loadClips(s.settings.animal || 'otter'); }, 1500);
   stage.classList.toggle('headset-on', !!s.headset || welcomeT > 0);
+  stage.classList.toggle('side-left', s.side === 'left');
   if (s.alert) lastChimeFor = ids;
   if (ids !== prevIds && s.queue.length) { const pri = s.queue.findIndex(q => q.kind === 'focus' || q.kind === 'preview'); idx = pri >= 0 ? pri : s.queue.length - 1; if (s.queue.length > prevIds.split(',').filter(Boolean).length) { flashMood = null; clearTimeout(flashTimer); } } // newest reminder wins over a passing face
   render();

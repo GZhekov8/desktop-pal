@@ -70,6 +70,7 @@
   .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .chips button { border: 1px solid #d8cabb; background: #fff; border-radius: 99px; padding: 4px 10px; cursor: pointer; font: 12px "Segoe UI"; }
   .chips button:hover { background: var(--soft); }
+  .os-mac { display: none; } .mac .os-mac { display: inline; } .mac .os-win { display: none; }
 </style>
 </head>
 <body>
@@ -145,8 +146,8 @@
       <div class="r"><div>Animal voice<small>A short purr, bark, squeak or yip when you pet it, feed it or it calls you</small></div><label class="switch"><input type="checkbox" id="s-voices"><span></span></label></div>
       <div class="r"><div>Quiet hours<small>No sounds during these hours; bubbles still show</small></div>
         <div style="display:flex;gap:6px;align-items:center"><label class="switch"><input type="checkbox" id="s-quietOn"><span></span></label><input type="time" id="s-quietFrom" style="width:110px"><span style="color:var(--muted)">–</span><input type="time" id="s-quietTo" style="width:110px"></div></div>
-      <div class="r"><div>Windows notifications too<small>Handy if your pet is hidden behind a full-screen app</small></div><label class="switch"><input type="checkbox" id="s-notifications"><span></span></label></div>
-      <div class="r"><div>Start with Windows</div><label class="switch"><input type="checkbox" id="s-startWithWindows"><span></span></label></div>
+      <div class="r"><div><span class="os-win">Windows notifications too</span><span class="os-mac">Mac notifications too</span><small>Handy if your pet is hidden behind a full-screen app</small></div><label class="switch"><input type="checkbox" id="s-notifications"><span></span></label></div>
+      <div class="r"><div><span class="os-win">Start with Windows</span><span class="os-mac">Open when I log in</span></div><label class="switch"><input type="checkbox" id="s-startWithWindows"><span></span></label></div>
       <div class="r"><div>Default snooze (minutes)</div><input type="number" id="s-snoozeDefault" min="1" max="240"></div>
       <div class="r"><div>Nudge me about open to-dos every… (minutes)<small>0 turns to-do nudges off</small></div><input type="number" id="s-todoNudgeMin" min="0" max="600"></div>
       <div class="r"><div>Try it<small>Make your pet show a reminder now</small></div><button class="btn" id="testBtn">Test reminder</button></div>
@@ -200,6 +201,7 @@
 </div>
 
 <script>
+if (window.otter && window.otter.platform === 'darwin') document.documentElement.classList.add('mac');
 const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
 let D = { reminders: [], settings: {}, queue: [] };
 let editing = null, ftype = 'once', fdays = [1,2,3,4,5];
@@ -335,8 +337,9 @@ function paintAbout(u) {
   if (ABOUT.canUpdate || (u.status && u.status !== 'off')) {
     if (u.status === 'downloading') line += ` · Downloading version ${u.version}… ${u.percent || 0}%`;
     else if (u.status === 'ready') line += ` · Version ${u.version} is ready`;
+    else if (u.status === 'available') line += ` · Version ${u.version} is out`;
     else if (UPD[u.status]) line += ` · ${UPD[u.status]}`;
-    $('#updBtn').textContent = u.status === 'ready' ? 'Restart to update' : 'Check for updates';
+    $('#updBtn').textContent = u.status === 'ready' ? 'Restart to update' : u.status === 'available' ? `Download ${u.version}` : 'Check for updates';
     $('#updBtn').style.display = '';
     $('#updBtn').onclick = async () => { $('#updBtn').disabled = true; paintAbout(await window.otter.checkUpdate()); $('#updBtn').disabled = false; };
   } else if (ABOUT.page) { $('#updBtn').textContent = 'Check for updates'; $('#updBtn').style.display = ''; $('#updBtn').onclick = () => window.otter.link(ABOUT.page); }

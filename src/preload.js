@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('otter', {
+  platform: process.platform,
   // pet window
   onState: (cb) => ipcRenderer.on('state', (_e, s) => cb(s)),
   onCalm: (cb) => ipcRenderer.on('calm', (_e, v) => cb(v)),
